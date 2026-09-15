@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserType {
+  admin
+  merchant
+}
+
+// pending: registered, not yet reviewed - API key exists but every
+// authenticated call is rejected. active: admin has approved and assigned
+// a commission. suspended: admin has since disabled the merchant.
+enum MerchantStatus {
+  pending
+  active
+  suspended
+}
+
+enum TransactionStatus {
+  pending
+  completed
+  failed
+  expired
+  refunded
+  partial_refunded
+}
+
+enum RefundStatus {
+  approved
+  declined
+}
+
+// Gateway-only additions (SESSION_EXPIRED, GATEWAY_ERROR) sit alongside the
+// exact set the Bank System returns - see bank-system/README.md.
+enum DeclineReason {
+  CURRENCY_NOT_SUPPORTED
+  INVALID_CARD
+  EXPIRED_CARD
+  CVV_MISMATCH
+  CARD_BLOCKED
+  ACCOUNT_FROZEN
+  ACCOUNT_CLOSED
+  INSUFFICIENT_FUNDS
+  LIMIT_EXCEEDED
+  REFERENCE_NOT_FOUND
+  ORIGINAL_NOT_APPROVED
+  REFUND_EXCEEDS_CHARGE
+  ACCOUNT_NOT_FOUND
+  SESSION_EXPIRED
+  GATEWAY_ERROR
+}
+
+model Currency {
+  id     Int    @id @default(autoincrement())
+  name   String
+  symbol String
+  code   String @unique
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  pricingPlans PricingPlan[]
+  wallets      Wallet[]
+  transactions Transaction[]
+
+  @@map("currencies")
+}
+
+// Display-only reference data. The Bank System's real base URL + X-API-KEY
+// live in .env, never in a DB row - secrets don't belong in a queryable table.
+model Bank {
+  id     Int     @id @default(autoincrement())
+  name   String
+  code   String  @unique
+  status Boolean @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("banks")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  userType     UserType @map("user_type")
+  status       Boolean  @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  merchant Merchant?
+
+  @@map("users")
+}
+
+model Merchant {
+  id            Int     @id @default(autoincrement())
+  userId        Int     @unique @map("user_id")
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  storeId       String  @unique @map("store_id")
+  name          String
+  address       String?
+  apiKeyHash    String         @unique @map("api_key_hash")
+  apiKeyPrefix  String         @map("api_key_prefix")
+  status        MerchantStatus @default(pending)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  pricingPlans PricingPlan[]
+  wallets      Wallet[]
+  transactions Transaction[]
+
+  @@map("merchants")
+}
+
+// A merchant's negotiated fee "deal" for a given currency. Flat rate
+// regardless of which bank issued the customer's card - real aggregators
+// absorb interchange variance themselves rather than passing it through.
+model PricingPlan {
+  id                   Int     @id @default(autoincrement())
+  merchantId           Int     @map("merchant_id")
+  merchant             Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  currencyId           Int     @map("currency_id")
+  currency             Currency @relation(fields: [currencyId], references: [id])
+  commissionPercentage Decimal @default(0) @map("commission_percentage") @db.Decimal(5, 2)
+  commissionFixed      Decimal @default(0) @map("commission_fixed") @db.Decimal(10, 2)
+  settlementDay        Int     @default(3) @map("settlement_day")
+  status               Boolean @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  transactions Transaction[]
+
+  @@unique([merchantId, currencyId])
+  @@map("pricing_plans")
+}
+
+model Wallet {
+  id         Int      @id @default(autoincrement())
+  merchantId Int      @map("merchant_id")
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  currencyId Int      @map("currency_id")
+  currency   Currency @relation(fields: [currencyId], references: [id])
+  balance    Decimal  @default(0) @db.Decimal(15, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([merchantId, currencyId])
+  @@map("wallets")
+}
+
+model Transaction {
+  id            Int               @id @default(autoincrement())
+  invoiceId     String            @unique @map("invoice_id")
+  orderId       String            @map("order_id")
+  merchantId    Int               @map("merchant_id")
+  merchant      Merchant          @relation(fields: [merchantId], references: [id])
+  currencyId    Int               @map("currency_id")
+  currency      Currency          @relation(fields: [currencyId], references: [id])
+  pricingPlanId Int?              @map("pricing_plan_id")
+  pricingPlan   PricingPlan?      @relation(fields: [pricingPlanId], references: [id])
+
+  status         TransactionStatus @default(pending)
+  grossAmount    Decimal           @map("gross_amount") @db.Decimal(15, 2)
+  feeAmount      Decimal           @default(0) @map("fee_amount") @db.Decimal(15, 2)
+  netAmount      Decimal           @default(0) @map("net_amount") @db.Decimal(15, 2)
+  refundedAmount Decimal           @default(0) @map("refunded_amount") @db.Decimal(15, 2)
+  declineReason  DeclineReason?    @map("decline_reason")
+  bankReference  String?           @unique @map("bank_reference")
+
+  successUrl     String   @map("success_url")
+  failUrl        String   @map("fail_url")
+  expiresAt      DateTime @map("expires_at")
+  settlementDate DateTime? @map("settlement_date") @db.Date
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  refunds Refund[]
+
+  @@index([merchantId])
+  @@map("transactions")
+}
+
+model Refund {
+  id             Int            @id @default(autoincrement())
+  transactionId  Int            @map("transaction_id")
+  transaction    Transaction    @relation(fields: [transactionId], references: [id])
+  invoiceId      String         @map("invoice_id")
+  amount         Decimal        @db.Decimal(15, 2)
+  status         RefundStatus
+  declineReason  DeclineReason? @map("decline_reason")
+  bankRefundReference String?   @map("bank_refund_reference")
+  idempotencyKey String         @unique @map("idempotency_key")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("refunds")
+}

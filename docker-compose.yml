@@ -1,9 +1,11 @@
-# Shared local dev infrastructure. The 3 systems (Bank, Payment Gateway,
-# Ecommerce) stay completely separate applications/codebases - this Postgres
-# server is just a convenience so you don't need 3 separate Postgres
-# processes running locally. Each app gets its own database on it (and each
-# additional simulated bank instance gets its own too), so there's still no
-# cross-system data access.
+# Shared local dev orchestration for all 3 systems. They stay completely
+# separate applications/codebases (own repo folder, own Dockerfile, own
+# package.json/requirements) - this file just brings them up together for
+# convenience, on one shared Postgres server so you don't need N separate
+# Postgres processes running locally. Each app gets its own database on it
+# (and each additional simulated bank instance gets its own too), so there's
+# still no cross-system data access - nothing here lets one app query
+# another's tables.
 services:
   postgres:
     image: postgres:18
@@ -51,6 +53,33 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  payment-gateway:
+    build: ./payment-system/backend
+    restart: unless-stopped
+    environment:
+      APP_NAME: Payment Gateway
+      PORT: 8000
+      NODE_ENV: production
+      LOG_LEVEL: info
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/payment_gateway
+      JWT_SECRET: dev-jwt-secret
+      SESSION_SECRET: dev-session-secret
+      # Same Docker network as bank-system here (both defined in this one
+      # compose file), so the plain service name resolves - no
+      # host.docker.internal needed now that they're orchestrated together.
+      BANK_API_BASE_URL: http://bank-system:8001
+      BANK_API_KEY: dev-bank-api-key
+      CHECKOUT_SESSION_TTL_MINUTES: 5
+      ADMIN_EMAIL: admin@gateway.local
+      ADMIN_PASSWORD: admin123
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      bank-system:
+        condition: service_started
 
 volumes:
   postgres_data:

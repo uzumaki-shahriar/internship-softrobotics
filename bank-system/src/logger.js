@@ -10,7 +10,12 @@ const logger = pino({
   level: config.logLevel,
   transport: {
     target: "pino-pretty",
-    options: { colorize: true, translateTime: "HH:MM:ss" },
+    options: {
+      colorize: true,
+      translateTime: "HH:MM:ss",
+      levelFirst: true,
+      ignore: "pid,hostname",
+    },
   },
 });
 
