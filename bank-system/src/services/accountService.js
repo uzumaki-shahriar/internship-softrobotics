@@ -18,11 +18,12 @@ async function getAccount(id) {
   return account;
 }
 
-async function createAccount({ holder_name, balance, daily_limit }) {
+async function createAccount({ holder_name, type, balance, daily_limit }) {
   return prisma.account.create({
     data: {
       accountNumber: generateAccountNumber(),
       holderName: holder_name,
+      type,
       balance,
       dailyLimit: daily_limit,
     },

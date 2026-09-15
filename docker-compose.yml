@@ -1,3 +1,9 @@
+# Shared local dev infrastructure. The 3 systems (Bank, Payment Gateway,
+# Ecommerce) stay completely separate applications/codebases - this Postgres
+# server is just a convenience so you don't need 3 separate Postgres
+# processes running locally. Each app gets its own database on it (and each
+# additional simulated bank instance gets its own too), so there's still no
+# cross-system data access.
 services:
   postgres:
     image: postgres:18
@@ -5,9 +11,13 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_MULTIPLE_DATABASES: payment_gateway,bank_demo
+      # Comma-separated - add a name here for every app / extra bank
+      # instance that should get its own database on this server.
+      POSTGRES_MULTIPLE_DATABASES: bank_demo,payment_gateway
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # Postgres 18's image stores data in a versioned subdirectory of
+      # /var/lib/postgresql (pg_ctlcluster-style), not .../data directly.
+      - postgres_data:/var/lib/postgresql
       - ./docker/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh:ro
     ports:
       - "5432:5432"
@@ -17,23 +27,10 @@ services:
       timeout: 5s
       retries: 10
 
-  payment-gateway:
-    build: ./payment-system/backend
-    restart: unless-stopped
-    environment:
-      APP_NAME: Payment Gateway
-      DEBUG: "true"
-      LOG_LEVEL: DEBUG
-      DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/payment_gateway
-    ports:
-      - "8000:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  # One instance = one bank. To simulate a second bank later, copy this
-  # service block, give it a different name/BANK_NAME/BANK_CODE/DATABASE_URL
-  # (add its name to POSTGRES_MULTIPLE_DATABASES above) and host port.
+  # One instance = one bank. To simulate a second bank later: add its
+  # database name to POSTGRES_MULTIPLE_DATABASES above, then copy this
+  # service block under a new name with a different BANK_NAME/BANK_CODE,
+  # DATABASE_URL (pointing at its own database), and host port.
   bank-system:
     build: ./bank-system
     restart: unless-stopped

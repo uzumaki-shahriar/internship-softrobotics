@@ -1,16 +1,17 @@
 const pino = require("pino");
 const config = require("./config");
 
-// pino-pretty in dev for readable console output; plain JSON in prod (so it
-// can be piped into a real log aggregator). err.stack (logged automatically
-// by pino for an `err` field) carries the exact file/line of any exception -
-// that's what makes errors traceable, not a custom formatter.
+// Same simple one-line format everywhere (dev and in Docker) - this is a
+// teaching project's logs read by a developer, not JSON piped into a log
+// aggregator. Every log call composes its own concise message (label,
+// endpoint, file:line where relevant - see errorUtils.getRootError) rather
+// than relying on structured fields.
 const logger = pino({
   level: config.logLevel,
-  transport:
-    config.nodeEnv === "development"
-      ? { target: "pino-pretty", options: { colorize: true, translateTime: "HH:MM:ss" } }
-      : undefined,
+  transport: {
+    target: "pino-pretty",
+    options: { colorize: true, translateTime: "HH:MM:ss" },
+  },
 });
 
 module.exports = logger;

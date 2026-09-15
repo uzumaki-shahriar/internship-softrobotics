@@ -1,6 +1,6 @@
 <h1><%= account.holderName %></h1>
 <p class="muted">
-  <%= account.accountNumber %> · <span class="badge badge-<%= account.status %>"><%= account.status %></span>
+  <%= account.accountNumber %> · <%= account.type %> · <span class="badge badge-<%= account.status %>"><%= account.status %></span>
 </p>
 <div class="stat-grid">
   <div class="stat-card">
@@ -31,6 +31,7 @@
   <% } %>
 </div>
 
+<% if (account.type === "personal") { %>
 <h2>Cards</h2>
 <table>
   <thead><tr><th>Card number</th><th>Holder</th><th>Expiry</th><th>Status</th></tr></thead>
@@ -45,6 +46,7 @@
     <% }) %>
   </tbody>
 </table>
+<% } %>
 
 <h2>Recent transactions</h2>
 <table>

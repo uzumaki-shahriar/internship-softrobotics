@@ -13,6 +13,11 @@ enum AccountStatus {
   closed
 }
 
+enum AccountType {
+  personal // a customer's account - pays via a linked card
+  business // a merchant's payout account - only ever receives credits, no card
+}
+
 enum CardStatus {
   active
   blocked
@@ -41,6 +46,7 @@ enum DeclineReason {
   REFERENCE_NOT_FOUND
   ORIGINAL_NOT_APPROVED
   REFUND_EXCEEDS_CHARGE
+  ACCOUNT_NOT_FOUND
 }
 
 model Admin {
@@ -58,6 +64,7 @@ model Account {
   id            Int           @id @default(autoincrement())
   accountNumber String        @unique @map("account_number")
   holderName    String        @map("holder_name")
+  type          AccountType   @default(personal)
   balance       Decimal       @default(1000.00) @db.Decimal(15, 2)
   dailyLimit    Decimal       @default(100000.00) @map("daily_limit") @db.Decimal(15, 2)
   status        AccountStatus @default(active)

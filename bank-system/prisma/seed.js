@@ -58,6 +58,32 @@ async function ensureAccountWithCard(holderName, { balance, dailyLimit, accountS
   return account;
 }
 
+// A merchant payout account - no card, ever. In real life this is what an
+// acquiring bank's admin sets up when a business opens a merchant account:
+// just an account that receives settlement deposits, nothing a customer
+// pays "from". The Payment Gateway would store this account_number against
+// the merchant record and pay into it (see payoutService.js).
+async function ensureBusinessAccount(holderName, { balance = 0, dailyLimit = 1000000 } = {}) {
+  const existing = await prisma.account.findFirst({ where: { holderName } });
+  if (existing) {
+    console.log(`Business account for ${holderName} already exists (${existing.accountNumber})`);
+    return existing;
+  }
+
+  const account = await prisma.account.create({
+    data: {
+      accountNumber: generateAccountNumber(),
+      holderName,
+      type: "business",
+      balance,
+      dailyLimit,
+    },
+  });
+
+  console.log(`Business account ${account.accountNumber} (${holderName}) - opening balance ${balance}`);
+  return account;
+}
+
 async function seed() {
   await upsertAdmin();
 
@@ -109,6 +135,10 @@ async function seed() {
     cardStatus: "active",
     expired: true,
   });
+
+  // Merchant payout account - matches "Merchant One" seeded in the
+  // Payment Gateway (payment-system/backend/app/seed.py, store STORE1001).
+  await ensureBusinessAccount("Merchant One", { balance: 0, dailyLimit: 1000000 });
 
   console.log("Seeding complete.");
 }
