@@ -18,19 +18,31 @@ LOG_DIR = Path(__file__).resolve().parent.parent.parent / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 
 CONSOLE_FORMAT = (
-    "<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | "
+    "<level>{level: <8}</level> | <green>{time:HH:mm:ss}</green> | "
     "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
 )
 
 FILE_FORMAT = (
-    "{time:YYYY-MM-DD HH:mm} | {level: <8} | {name}:{function}:{line} - {message}"
+    "{level: <8} | {time:YYYY-MM-DD HH:mm} | {name}:{function}:{line} - {message}"
 )
+
+
+# Starlette's ServerErrorMiddleware always re-raises an exception after an
+# app.exception_handler already turned it into a response, purely so the
+# ASGI server can log it too (its own comment: "allows servers to log the
+# error"). uvicorn logs that as this exact message. Since our own handlers
+# in app/core/utils/exceptions.py already log every error with file/line,
+# forwarding this one too would just duplicate it - so it's dropped here.
+_REDUNDANT_MESSAGES = {"Exception in ASGI application"}
 
 
 class InterceptHandler(logging.Handler):
     """Redirects records from stdlib `logging` (uvicorn, sqlalchemy, ...) into loguru."""
 
     def emit(self, record: logging.LogRecord) -> None:
+        if record.name == "uvicorn.error" and record.getMessage().strip() in _REDUNDANT_MESSAGES:
+            return
+
         try:
             level = logger.level(record.levelname).name
         except ValueError:
@@ -60,6 +72,10 @@ def configure_logging() -> None:
         diagnose=False,
     )
 
+    # diagnose=False everywhere: it dumps every local variable per stack
+    # frame, which turns one error into hundreds of log lines (and can leak
+    # secrets held in locals). Our own exception handlers already log a
+    # concise, app-only traceback - see app/core/utils/error_utils.py.
     logger.add(
         LOG_DIR / "app.log",
         format=FILE_FORMAT,
@@ -67,8 +83,8 @@ def configure_logging() -> None:
         rotation="10 MB",
         retention="14 days",
         compression="zip",
-        backtrace=True,
-        diagnose=settings.DEBUG,
+        backtrace=False,
+        diagnose=False,
         enqueue=True,
     )
 
@@ -79,8 +95,8 @@ def configure_logging() -> None:
         rotation="10 MB",
         retention="30 days",
         compression="zip",
-        backtrace=True,
-        diagnose=settings.DEBUG,
+        backtrace=False,
+        diagnose=False,
         enqueue=True,
     )
 
