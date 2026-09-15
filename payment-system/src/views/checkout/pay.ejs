@@ -9,9 +9,17 @@
     This payment link expires in <span id="countdown">a few minutes</span>
   </div>
 
-  <% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
+  <% if (error) { %>
+    <div class="flash flash-error">
+      <%= error %>
+      <% if (typeof attemptsRemaining !== 'undefined' && attemptsRemaining > 0) { %>
+        <span class="muted">(<%= attemptsRemaining %> attempt<%= attemptsRemaining === 1 ? '' : 's' %> left)</span>
+      <% } %>
+    </div>
+  <% } %>
 
   <form method="post" action="/checkout/<%= transaction.invoiceId %>/pay" id="pay-form" novalidate>
+    <input type="hidden" name="attempt_token" value="<%= transaction.currentAttemptToken %>" />
     <label>Card number
       <input type="text" name="card_number" inputmode="numeric" autocomplete="cc-number"
              placeholder="4242 4242 4242 4242" value="<%= values.card_number || '' %>" required />
@@ -36,6 +44,38 @@
     </div>
     <button type="submit">Pay <%= transaction.currency.symbol %><%= transaction.grossAmount %></button>
   </form>
+
+  <form method="post" action="/checkout/<%= transaction.invoiceId %>/cancel" id="cancel-form">
+    <button type="submit" class="btn-link-muted" onclick="return confirm('Cancel this payment and return to the merchant?')">
+      Cancel and return to merchant
+    </button>
+  </form>
 </div>
+
+<% if (testCards && testCards.length > 0) { %>
+  <div class="checkout-card test-cards-panel">
+    <h2>Sandbox test cards</h2>
+    <p class="muted">This is a test environment - click one to fill the form above, then hit Pay.</p>
+    <div class="test-card-list">
+      <% testCards.forEach(function(c) { %>
+        <button
+          type="button"
+          class="test-card-btn <%= c.expected_result === 'approved' ? 'test-card-approve' : 'test-card-decline' %>"
+          data-card-number="<%= c.card_number %>"
+          data-card-holder-name="<%= c.holder_name %>"
+          data-expiry-month="<%= c.expiry_month %>"
+          data-expiry-year="<%= c.expiry_year %>"
+          data-cvv="<%= c.cvv %>"
+        >
+          <span class="test-card-icon"><%= c.expected_result === 'approved' ? '✅' : '❌' %></span>
+          <span class="test-card-label"><%= c.label %></span>
+          <span class="test-card-holder muted"><%= c.holder_name %></span>
+        </button>
+      <% }) %>
+    </div>
+  </div>
+<% } %>
+
 <script src="/js/validation.js"></script>
 <script src="/js/countdown.js"></script>
+<script src="/js/test-cards.js"></script>

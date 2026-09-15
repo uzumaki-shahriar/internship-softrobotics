@@ -1,7 +1,14 @@
 <%
+const failedCopy = {
+  CANCELLED: { title: "Payment cancelled", body: "You cancelled this payment and no charge was made." },
+  TOO_MANY_ATTEMPTS: { title: "Too many attempts", body: "This checkout session was locked after too many declined cards. Please start a new order." },
+}[transaction.declineReason] || {
+  title: "Payment failed",
+  body: `This payment was declined${transaction.declineReason ? " (" + transaction.declineReason + ")" : ""}.`,
+};
 const copy = {
   completed: { title: "Payment complete", body: "This order has already been paid." },
-  failed: { title: "Payment failed", body: `This payment was declined${transaction.declineReason ? " (" + transaction.declineReason + ")" : ""}.` },
+  failed: failedCopy,
   expired: { title: "Payment link expired", body: "This checkout session is no longer valid. Please start a new order." },
 }[transaction.status] || { title: "Session closed", body: "This checkout session can no longer be paid." };
 %>

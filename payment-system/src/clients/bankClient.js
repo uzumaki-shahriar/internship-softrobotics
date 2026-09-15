@@ -35,4 +35,22 @@ function refund(payload) {
   return callBank("/api/cards/refund", payload);
 }
 
-module.exports = { charge, refund };
+// Testing convenience only - lets the checkout page show one-click "fill
+// this card" buttons for whatever the Bank System currently has seeded,
+// instead of hardcoding numbers that change on every reseed. Never fails
+// the checkout page if the Bank is unreachable - the form still works,
+// it just won't have the shortcut buttons.
+async function getTestCards() {
+  try {
+    const res = await fetch(`${config.bankApiBaseUrl}/api/test-cards`, {
+      headers: { "X-API-KEY": config.bankApiKey },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+module.exports = { charge, refund, getTestCards };

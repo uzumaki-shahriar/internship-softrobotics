@@ -1,7 +1,7 @@
 const prisma = require("../db");
 const config = require("../config");
 const bankClient = require("../clients/bankClient");
-const { generateInvoiceId } = require("../utils/generators");
+const { generateInvoiceId, generateAttemptToken } = require("../utils/generators");
 const { calculateFee } = require("../utils/fee");
 const { NotFoundError, ValidationError } = require("../errors");
 
@@ -81,29 +81,89 @@ function successUrlFor(transaction) {
 }
 
 /**
+ * Mints a fresh attempt token and saves it as the session's current one.
+ * Called every time the pay form is (re)rendered - initial GET, and after
+ * a non-fatal decline that still has retries left. The token becomes part
+ * of that attempt's Bank System idempotency key (see payForSession): a
+ * raw double-submit of the same rendered page reuses the same token (the
+ * bank correctly dedupes it and returns the same result), while a fresh
+ * page render - i.e. an intentional retry with a different card - gets a
+ * new token (the bank correctly treats it as a new charge to evaluate).
+ */
+async function prepareAttempt(transaction) {
+  const currentAttemptToken = generateAttemptToken();
+  return prisma.transaction.update({
+    where: { id: transaction.id },
+    include: TRANSACTION_INCLUDE,
+    data: { currentAttemptToken },
+  });
+}
+
+/**
+ * Customer-initiated abandonment - same real-world action as closing
+ * Stripe Checkout or hitting "back" on SSLCommerz. Only a still-pending
+ * session can be cancelled; anything already resolved is left untouched.
+ */
+async function cancelSession(invoiceId) {
+  let transaction = await findTransaction(invoiceId);
+  transaction = await expireIfNeeded(transaction);
+  if (transaction.status !== "pending") {
+    return { redirectUrl: failUrlWithReason(transaction, transaction.declineReason || "FAILED"), status: transaction.status };
+  }
+
+  transaction = await prisma.transaction.update({
+    where: { id: transaction.id },
+    include: TRANSACTION_INCLUDE,
+    data: { status: "failed", declineReason: "CANCELLED" },
+  });
+  return { redirectUrl: failUrlWithReason(transaction, "CANCELLED"), status: "failed", declineReason: "CANCELLED" };
+}
+
+/**
  * Processes a payment attempt against a checkout session. Never trusts an
  * amount/currency from the request - always the session's own stored
  * values, so a customer can't tamper with the price in their browser.
+ *
+ * A decline doesn't automatically end the session: real hosted checkouts
+ * (Stripe, SSLCommerz) let the customer retry with a different card on the
+ * SAME session, up to a capped number of attempts (config.maxPaymentAttempts)
+ * to blunt card-testing fraud. Only exhausting that cap - or an approval -
+ * is terminal; everything else re-renders the same pay page.
  */
-async function payForSession(invoiceId, cardDetails) {
+async function payForSession(invoiceId, cardDetails, submittedToken) {
   let transaction = await findTransaction(invoiceId);
 
   // Already resolved one way or another - don't re-charge, just report
   // where it landed (handles a double form-submit safely).
   if (transaction.status === "completed") {
-    return { redirectUrl: successUrlFor(transaction), status: "completed" };
+    return { terminal: true, redirectUrl: successUrlFor(transaction), status: "completed" };
   }
   if (transaction.status === "failed" || transaction.status === "expired") {
     const reason = transaction.declineReason || "FAILED";
-    return { redirectUrl: failUrlWithReason(transaction, reason), status: transaction.status, declineReason: reason };
+    return { terminal: true, redirectUrl: failUrlWithReason(transaction, reason), status: transaction.status, declineReason: reason };
   }
 
   transaction = await expireIfNeeded(transaction);
   if (transaction.status === "expired") {
     return {
+      terminal: true,
       redirectUrl: failUrlWithReason(transaction, "SESSION_EXPIRED"),
       status: "expired",
       declineReason: "SESSION_EXPIRED",
+    };
+  }
+
+  // A stale/mismatched token means this submit doesn't belong to the
+  // currently-rendered form (e.g. browser back button to an old page after
+  // a retry already happened) - reject client-side, no bank call needed.
+  if (!transaction.currentAttemptToken || submittedToken !== transaction.currentAttemptToken) {
+    transaction = await prepareAttempt(transaction);
+    return {
+      terminal: false,
+      transaction,
+      status: "pending",
+      declineReason: null,
+      formError: "This payment form has expired, please try again",
     };
   }
 
@@ -115,7 +175,10 @@ async function payForSession(invoiceId, cardDetails) {
     cvv: cardDetails.cvv,
     amount: Number(transaction.grossAmount),
     currency: transaction.currency.code,
-    idempotency_key: transaction.invoiceId,
+    // Scoped per-attempt (not just per-invoice) so an intentional retry with
+    // a new card is evaluated fresh instead of being deduped against the
+    // previous, different, decline.
+    idempotency_key: `${transaction.invoiceId}:${submittedToken}`,
     reference: transaction.invoiceId,
   });
 
@@ -139,19 +202,39 @@ async function payForSession(invoiceId, cardDetails) {
         create: { merchantId: transaction.merchantId, currencyId: transaction.currencyId, balance: net },
       }),
     ]);
-    return { redirectUrl: successUrlFor(transaction), status: "completed" };
+    return { terminal: true, redirectUrl: successUrlFor(transaction), status: "completed" };
+  }
+
+  const attemptCount = transaction.attemptCount + 1;
+  const attemptsExhausted = attemptCount >= config.maxPaymentAttempts;
+
+  if (attemptsExhausted) {
+    transaction = await prisma.transaction.update({
+      where: { id: transaction.id },
+      include: TRANSACTION_INCLUDE,
+      data: { status: "failed", declineReason: "TOO_MANY_ATTEMPTS", attemptCount },
+    });
+    return {
+      terminal: true,
+      redirectUrl: failUrlWithReason(transaction, "TOO_MANY_ATTEMPTS"),
+      status: "failed",
+      declineReason: "TOO_MANY_ATTEMPTS",
+    };
   }
 
   transaction = await prisma.transaction.update({
     where: { id: transaction.id },
     include: TRANSACTION_INCLUDE,
-    data: { status: "failed", declineReason: bankResult.decline_reason },
+    data: { declineReason: bankResult.decline_reason, attemptCount },
   });
+  transaction = await prepareAttempt(transaction);
   return {
-    redirectUrl: failUrlWithReason(transaction, bankResult.decline_reason),
-    status: "failed",
+    terminal: false,
+    transaction,
+    status: "pending",
     declineReason: bankResult.decline_reason,
+    attemptsRemaining: config.maxPaymentAttempts - attemptCount,
   };
 }
 
-module.exports = { initCheckout, findTransaction, expireIfNeeded, payForSession };
+module.exports = { initCheckout, findTransaction, expireIfNeeded, prepareAttempt, cancelSession, payForSession };

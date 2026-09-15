@@ -34,6 +34,12 @@ function generateInvoiceId() {
   return "inv_" + crypto.randomBytes(18).toString("base64url");
 }
 
+// One of these is minted every time the pay form is (re)rendered and becomes
+// part of that attempt's Bank System idempotency key - see checkoutService.js.
+function generateAttemptToken() {
+  return crypto.randomBytes(16).toString("base64url");
+}
+
 // For admin-created merchants - never chosen by the admin, shown to them
 // exactly once so they can hand it to the merchant out of band.
 function generateTemporaryPassword() {
@@ -47,4 +53,5 @@ module.exports = {
   hashApiKey,
   generateInvoiceId,
   generateTemporaryPassword,
+  generateAttemptToken,
 };

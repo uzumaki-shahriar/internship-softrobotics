@@ -53,6 +53,8 @@ enum DeclineReason {
   ACCOUNT_NOT_FOUND
   SESSION_EXPIRED
   GATEWAY_ERROR
+  TOO_MANY_ATTEMPTS
+  CANCELLED
 }
 
 model Currency {
@@ -178,6 +180,19 @@ model Transaction {
   refundedAmount Decimal           @default(0) @map("refunded_amount") @db.Decimal(15, 2)
   declineReason  DeclineReason?    @map("decline_reason")
   bankReference  String?           @unique @map("bank_reference")
+
+  // Lets a declined attempt retry with a different card on the SAME
+  // session instead of bouncing the customer back to the merchant to start
+  // a whole new order - see checkoutService.js. attemptCount is capped
+  // (config.maxPaymentAttempts) as a card-testing-fraud guard, same reason
+  // real checkouts (Stripe, SSLCommerz) lock a session after too many
+  // declines. currentAttemptToken changes on every render of the pay form
+  // and becomes that attempt's Bank System idempotency key - a raw
+  // double-submit of the same rendered form reuses the same token (the
+  // bank correctly dedupes it), while an intentional retry with a new card
+  // gets a fresh token (the bank correctly re-evaluates it).
+  attemptCount        Int     @default(0) @map("attempt_count")
+  currentAttemptToken String? @map("current_attempt_token")
 
   successUrl     String   @map("success_url")
   failUrl        String   @map("fail_url")

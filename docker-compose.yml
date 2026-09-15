@@ -70,6 +70,11 @@ services:
       # host.docker.internal needed now that they're orchestrated together.
       BANK_API_BASE_URL: http://bank-system:8001
       BANK_API_KEY: dev-bank-api-key
+      # The customer-facing address for checkout_url - always the host
+      # machine's port, never the internal Docker hostname, since it also
+      # gets called by other containers (ecommerce-app) whose Host header
+      # a customer's browser could never resolve.
+      PUBLIC_BASE_URL: http://localhost:8000
       CHECKOUT_SESSION_TTL_MINUTES: 5
       ADMIN_EMAIL: admin@gateway.local
       ADMIN_PASSWORD: admin123
