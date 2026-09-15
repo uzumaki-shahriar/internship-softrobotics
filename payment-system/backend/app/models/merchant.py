@@ -10,6 +10,7 @@ class Merchant(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id")
     store_id: str = Field(unique=True, index=True)
+    api_key: str = Field(unique=True, index=True)
     name: str
     email: str = Field(unique=True, index=True)
     address: Optional[str] = None

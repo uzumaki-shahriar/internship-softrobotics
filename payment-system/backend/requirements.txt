@@ -3,6 +3,8 @@ uvicorn[standard]==0.32.1
 sqlmodel==0.0.42
 psycopg2-binary==2.9.10
 pydantic-settings==2.6.1
+email-validator
 loguru==0.7.2
 bcrypt==5.0.0
 alembic==1.14.0
+PyJWT==2.9.0

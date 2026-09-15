@@ -16,6 +16,15 @@ class Settings(BaseSettings):
     # postgresql+psycopg2://gateway_user:gateway_pass@localhost:5432/payment_gateway
     DATABASE_URL: str
 
+    # JWT — used by Module 3 (auth) to sign and verify merchant/admin tokens
+    JWT_SECRET: str
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRE_MINUTES: int = 60
+
+    # Shared static API key for internal/admin server-to-server calls
+    # (sent as X-API-KEY header by trusted callers, e.g. the Bank System)
+    GATEWAY_API_KEY: str
+
 
 @lru_cache
 def get_settings() -> Settings:
