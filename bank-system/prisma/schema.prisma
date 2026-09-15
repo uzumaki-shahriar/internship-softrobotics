@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountStatus {
+  active
+  frozen
+  closed
+}
+
+enum CardStatus {
+  active
+  blocked
+}
+
+enum TransactionType {
+  debit
+  credit
+}
+
+enum TransactionStatus {
+  approved
+  declined
+}
+
+enum DeclineReason {
+  CURRENCY_NOT_SUPPORTED
+  INVALID_CARD
+  EXPIRED_CARD
+  CVV_MISMATCH
+  CARD_BLOCKED
+  ACCOUNT_FROZEN
+  ACCOUNT_CLOSED
+  INSUFFICIENT_FUNDS
+  LIMIT_EXCEEDED
+  REFERENCE_NOT_FOUND
+  ORIGINAL_NOT_APPROVED
+  REFUND_EXCEEDS_CHARGE
+}
+
+model Admin {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("admins")
+}
+
+model Account {
+  id            Int           @id @default(autoincrement())
+  accountNumber String        @unique @map("account_number")
+  holderName    String        @map("holder_name")
+  balance       Decimal       @default(1000.00) @db.Decimal(15, 2)
+  dailyLimit    Decimal       @default(100000.00) @map("daily_limit") @db.Decimal(15, 2)
+  status        AccountStatus @default(active)
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  cards        Card[]
+  transactions BankTransaction[]
+
+  @@map("accounts")
+}
+
+model Card {
+  id             Int        @id @default(autoincrement())
+  accountId      Int        @map("account_id")
+  account        Account    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  cardNumber     String     @unique @map("card_number")
+  cardHolderName String     @map("card_holder_name")
+  expiryMonth    Int        @map("expiry_month")
+  expiryYear     Int        @map("expiry_year")
+  cvv            String
+  status         CardStatus @default(active)
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  transactions BankTransaction[]
+
+  @@map("cards")
+}
+
+model BankTransaction {
+  id             Int      @id @default(autoincrement())
+  bankReference  String   @unique @map("bank_reference")
+  idempotencyKey String   @unique @map("idempotency_key")
+  gatewayReference String @map("gateway_reference")
+
+  accountId Int?     @map("account_id")
+  account   Account? @relation(fields: [accountId], references: [id])
+  cardId    Int?     @map("card_id")
+  card      Card?    @relation(fields: [cardId], references: [id])
+
+  type         TransactionType
+  amount       Decimal            @db.Decimal(15, 2)
+  currency     String
+  balanceAfter Decimal?           @map("balance_after") @db.Decimal(15, 2)
+  status       TransactionStatus
+  declineReason DeclineReason?    @map("decline_reason")
+
+  relatedTransactionId Int?              @map("related_transaction_id")
+  relatedTransaction   BankTransaction?  @relation("Reversal", fields: [relatedTransactionId], references: [id])
+  reversals            BankTransaction[] @relation("Reversal")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("bank_transactions")
+}

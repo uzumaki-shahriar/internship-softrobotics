@@ -1,0 +1,64 @@
+<h1><%= account.holderName %></h1>
+<p class="muted">
+  <%= account.accountNumber %> · <span class="badge badge-<%= account.status %>"><%= account.status %></span>
+</p>
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-value"><%= account.balance %></div>
+    <div class="stat-label">Balance</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value"><%= account.dailyLimit %></div>
+    <div class="stat-label">Daily limit</div>
+  </div>
+</div>
+
+<div class="actions">
+  <% if (account.status !== "frozen") { %>
+    <form method="post" action="/admin/accounts/<%= account.id %>/freeze" class="confirm-form" data-confirm="Freeze this account?">
+      <button type="submit">Freeze</button>
+    </form>
+  <% } %>
+  <% if (account.status === "frozen") { %>
+    <form method="post" action="/admin/accounts/<%= account.id %>/unfreeze">
+      <button type="submit">Unfreeze</button>
+    </form>
+  <% } %>
+  <% if (account.status !== "closed") { %>
+    <form method="post" action="/admin/accounts/<%= account.id %>/close" class="confirm-form" data-confirm="Close this account? This cannot be undone.">
+      <button type="submit" class="danger">Close account</button>
+    </form>
+  <% } %>
+</div>
+
+<h2>Cards</h2>
+<table>
+  <thead><tr><th>Card number</th><th>Holder</th><th>Expiry</th><th>Status</th></tr></thead>
+  <tbody>
+    <% account.cards.forEach(function(c) { %>
+      <tr>
+        <td><%= c.cardNumber.replace(/\d(?=\d{4})/g, "*") %></td>
+        <td><%= c.cardHolderName %></td>
+        <td><%= String(c.expiryMonth).padStart(2, "0") %>/<%= c.expiryYear %></td>
+        <td><span class="badge badge-<%= c.status %>"><%= c.status %></span></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+
+<h2>Recent transactions</h2>
+<table>
+  <thead><tr><th>When</th><th>Type</th><th>Amount</th><th>Status</th><th>Reason</th><th>Reference</th></tr></thead>
+  <tbody>
+    <% account.transactions.forEach(function(t) { %>
+      <tr>
+        <td><%= t.createdAt.toISOString() %></td>
+        <td><%= t.type %></td>
+        <td><%= t.amount %> <%= t.currency %></td>
+        <td><span class="badge badge-<%= t.status %>"><%= t.status %></span></td>
+        <td><%= t.declineReason || "-" %></td>
+        <td><%= t.bankReference %></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>

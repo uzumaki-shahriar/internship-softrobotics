@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_MULTIPLE_DATABASES: payment_gateway,bank_demo
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  payment-gateway:
+    build: ./payment-system/backend
+    restart: unless-stopped
+    environment:
+      APP_NAME: Payment Gateway
+      DEBUG: "true"
+      LOG_LEVEL: DEBUG
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/payment_gateway
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # One instance = one bank. To simulate a second bank later, copy this
+  # service block, give it a different name/BANK_NAME/BANK_CODE/DATABASE_URL
+  # (add its name to POSTGRES_MULTIPLE_DATABASES above) and host port.
+  bank-system:
+    build: ./bank-system
+    restart: unless-stopped
+    environment:
+      BANK_NAME: Demo Bank
+      BANK_CODE: DEMO001
+      BANK_CURRENCY: BDT
+      PORT: 8001
+      NODE_ENV: production
+      LOG_LEVEL: info
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/bank_demo
+      BANK_API_KEY: dev-bank-api-key
+      SESSION_SECRET: dev-session-secret
+      ADMIN_EMAIL: admin@bank.local
+      ADMIN_PASSWORD: admin123
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
