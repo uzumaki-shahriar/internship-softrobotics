@@ -101,6 +101,16 @@ def configure_logging() -> None:
     )
 
     logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
-    for name in ("uvicorn", "uvicorn.access", "uvicorn.error", "sqlalchemy.engine"):
+    for name in (
+        "uvicorn",
+        "uvicorn.access",
+        "uvicorn.error",
+        "sqlalchemy.engine",
+        # SQLAlchemy's echo=True attaches its own StreamHandler directly to
+        # this logger (not "sqlalchemy.engine") the first time an engine is
+        # created - left alone, it prints raw AND propagates up to be
+        # reformatted by us, so every query is logged twice.
+        "sqlalchemy.engine.Engine",
+    ):
         logging.getLogger(name).handlers = [InterceptHandler()]
         logging.getLogger(name).propagate = False
