@@ -1,0 +1,13 @@
+[
+    {
+        "id": "ORD-1789476347",
+        "invoice_id": "INV-1789476347",
+        "product_id": "PROD101",
+        "product_name": "Soft Robotics Starter Kit",
+        "buyer_name": "Rafiq Ahmed",
+        "buyer_email": "rafiq@example.com",
+        "amount": 500,
+        "status": "paid",
+        "created_at": "2026-09-15 18:45:47"
+    }
+]

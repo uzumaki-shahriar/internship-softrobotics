@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Payment Successful — RoboTech Store{% endblock %}
+
+{% block extra_css %}
+<style>
+    .result-card {
+        max-width: 550px;
+        margin: 3rem auto;
+        background: var(--card-bg);
+        border: 1px solid rgba(16, 185, 129, 0.4);
+        border-radius: 1rem;
+        padding: 2.5rem;
+        text-align: center;
+        backdrop-filter: blur(12px);
+        box-shadow: 0 20px 40px rgba(16, 185, 129, 0.15);
+    }
+
+    .icon-success {
+        width: 70px;
+        height: 70px;
+        background: rgba(16, 185, 129, 0.2);
+        color: var(--accent);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.5rem;
+        margin: 0 auto 1.5rem auto;
+        border: 2px solid var(--accent);
+    }
+
+    .result-title {
+        font-size: 1.8rem;
+        font-weight: 800;
+        margin-bottom: 0.5rem;
+        color: #fff;
+    }
+
+    .result-subtitle {
+        color: var(--text-muted);
+        margin-bottom: 2rem;
+    }
+
+    .invoice-details {
+        background: #0f172a;
+        border-radius: 0.75rem;
+        padding: 1.25rem;
+        margin-bottom: 2rem;
+        text-align: left;
+    }
+
+    .detail-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.75rem;
+        font-size: 0.95rem;
+    }
+
+    .detail-row:last-child {
+        margin-bottom: 0;
+        border-top: 1px solid var(--border-color);
+        padding-top: 0.75rem;
+    }
+
+    .detail-label {
+        color: var(--text-muted);
+    }
+
+    .detail-val {
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="result-card">
+    <div class="icon-success">✓</div>
+    <h1 class="result-title">Payment Successful!</h1>
+    <p class="result-subtitle">Thank you for your purchase. Your order has been confirmed.</p>
+
+    {% if order %}
+    <div class="invoice-details">
+        <div class="detail-row">
+            <span class="detail-label">Invoice ID:</span>
+            <span class="detail-val">{{ order.invoice_id }}</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Order ID:</span>
+            <span class="detail-val">{{ order.id }}</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Product:</span>
+            <span class="detail-val">{{ order.product_name }}</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Customer Name:</span>
+            <span class="detail-val">{{ order.buyer_name }}</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Status:</span>
+            <span class="detail-val" style="color:var(--accent); font-weight:700">PAID</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Total Amount Paid:</span>
+            <span class="detail-val" style="color:var(--accent); font-size:1.1rem">৳{{ order.amount }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    <a href="/" class="btn btn-primary">Return to Shop</a>
+</div>
+{% endblock %}

@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Payment Gateway Simulator — Hosted Checkout{% endblock %}
+
+{% block extra_css %}
+<style>
+    .checkout-box {
+        max-width: 500px;
+        margin: 2rem auto;
+        background: #1e293b;
+        border: 1px solid var(--border-color);
+        border-radius: 1rem;
+        padding: 2rem;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .box-header {
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 1rem;
+        margin-bottom: 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .box-header h2 {
+        font-size: 1.25rem;
+        color: #818cf8;
+    }
+
+    .order-info {
+        background: #0f172a;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+        font-size: 0.95rem;
+    }
+
+    .info-row:last-child {
+        margin-bottom: 0;
+    }
+
+    .info-label {
+        color: var(--text-muted);
+    }
+
+    .info-value {
+        font-weight: 600;
+    }
+
+    .form-group {
+        margin-bottom: 1.2rem;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 0.4rem;
+        font-size: 0.9rem;
+        color: var(--text-muted);
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        background: #0f172a;
+        border: 1px solid var(--border-color);
+        border-radius: 0.5rem;
+        color: #fff;
+        font-size: 1rem;
+    }
+
+    .actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-top: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="checkout-box">
+    <div class="box-header">
+        <h2>💳 Gateway Checkout Simulator</h2>
+        <span class="badge" style="background:rgba(16, 185, 129, 0.2); color:#10b981; border-color:rgba(16, 185, 129, 0.3)">Mock Mode</span>
+    </div>
+
+    <div class="order-info">
+        <div class="info-row">
+            <span class="info-label">Invoice ID:</span>
+            <span class="info-value">{{ order.invoice_id }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Item:</span>
+            <span class="info-value">{{ order.product_name }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Amount:</span>
+            <span class="info-value" style="color:var(--accent)">৳{{ order.amount }}</span>
+        </div>
+    </div>
+
+    <form method="POST" action="/mock-gateway/{{ order.invoice_id }}/pay">
+        <div class="form-group">
+            <label>Select Bank / Payment Method</label>
+            <select class="form-control">
+                <option>National Bank (NB001)</option>
+                <option>City Bank (CB002)</option>
+                <option>Dutch-Bangla Bank (DB003)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Bank Account Number</label>
+            <input type="text" class="form-control" value="ACC1001" required>
+        </div>
+        <div class="form-group">
+            <label>Password / PIN</label>
+            <input type="password" class="form-control" value="pass123" required>
+        </div>
+
+        <div class="actions">
+            <button type="submit" class="btn btn-success">Pay ৳{{ order.amount }}</button>
+    </form>
+            <form method="POST" action="/mock-gateway/{{ order.invoice_id }}/cancel" style="margin:0">
+                <button type="submit" class="btn btn-danger" style="width:100%">Cancel</button>
+            </form>
+        </div>
+</div>
+{% endblock %}
