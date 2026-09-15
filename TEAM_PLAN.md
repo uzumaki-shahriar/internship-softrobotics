@@ -4,7 +4,9 @@
 
 3 independent systems (Bank, Gateway, Ecommerce) split into **7 independent modules** so each of the 7 members can work in parallel, with clear milestones and handoff contracts (API specs).
 
-**Stack:** Node.js + Express | MySQL | Plain HTML/CSS/JS (minimal UI) | Shared API key auth
+**The scenario:** a customer buys something on the Ecommerce App. The shop hands the customer off to our Payment Gateway instead of touching payment details itself. The customer enters their **card** (number, expiry, CVV, name) on the Gateway's checkout page. The Gateway sends that to the Bank System, which is the only system that owns accounts/cards — it validates everything a real bank would (card valid, account active, enough balance, within limits), moves the money, and returns approved or a specific decline reason. See `README.md` §2 for the full security/data-boundary rules — read that before building anything, especially Modules 1 and 4.
+
+**Stack:** Payment Gateway (Modules 2, 3, 4, 5, 7) is FastAPI + SQLModel + PostgreSQL — already scaffolded, see `payment-system/README.md` for conventions (response shape, pagination, error handling, logging). Bank System (Module 1) and Ecommerce App (Module 6) should match this stack for consistency unless there's a strong reason not to.
 
 **Ports:**
 - `8001` → Bank System
@@ -33,78 +35,70 @@ Milestone 3 (M3) — Full System Live  → Modules 6, 7 complete
 **System:** Bank System (Port 8001)
 
 #### Responsibilities
-- Set up Node/Express project for Bank System
-- Design and create the Bank DB schema
-- Build all Bank API endpoints
-- Seed dummy accounts & data
+- Set up the Bank System project (FastAPI recommended, see Stack above)
+- Design and create the Bank DB schema — accounts **and cards**
+- Build the charge/refund API with full real-bank-style validation and decline reasons
+- Seed accounts, cards, and **deliberately-broken test cases** (frozen account, expired card, low limit) so Module 4 can test failure paths, not just the happy path
 
 #### Database Schema
-```sql
+```
 accounts
-  id, account_number, holder_name, password_hash, balance (default 1000.00), status, created_at
+  id, account_number (unique), holder_name, balance (default 1000.00),
+  status (active | frozen | closed), daily_limit, created_at
 
-bank_transactions
-  id, account_id, type (debit/credit), amount, balance_after, reference, created_at
+cards
+  id, account_id (FK), card_number, card_holder_name,
+  expiry_month, expiry_year, cvv, status (active | blocked), created_at
+
+bank_transactions   (ledger — one row per charge/refund attempt, approved OR declined)
+  id, account_id, card_id, type (debit | credit), amount, balance_after,
+  reference, idempotency_key (unique), status (approved | declined),
+  decline_reason (nullable), created_at
 ```
 
 #### API Endpoints to Build
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/auth/login` | Validate account_number + password → return session token |
-| `GET` | `/api/accounts/:id/balance` | Get account balance |
-| `POST` | `/api/accounts/:id/debit` | Deduct amount from account |
-| `POST` | `/api/accounts/:id}/credit` | Add amount to account (refund) |
+| `POST` | `/api/cards/charge` | Validate card + account, debit if OK, return approved/declined |
+| `POST` | `/api/cards/refund` | Credit the account tied to a previous approved charge |
+| `GET` | `/api/accounts/{account_number}/balance` | Check balance (testing/admin use) |
+
+`POST /api/cards/charge` request/response — see `README.md` §3 for the exact JSON shape.
+
+#### Validation order (must produce these exact decline reasons)
+1. Card exists, not expired, CVV matches → else `INVALID_CARD` / `EXPIRED_CARD` / `CVV_MISMATCH`
+2. Card `status == active` → else `CARD_BLOCKED`
+3. Account `status == active` → else `ACCOUNT_FROZEN`
+4. `balance >= amount` → else `INSUFFICIENT_FUNDS`
+5. `amount <= daily_limit` → else `LIMIT_EXCEEDED`
+6. If `idempotency_key` seen before → return the stored result of that original attempt, **do not charge again**
+
+Write a `bank_transactions` row for every attempt, approved or declined — a real bank's ledger records declines too.
 
 #### Auth
 - All endpoints protected by shared `X-API-KEY` header (value agreed with Module 4)
 
 #### Seed Data
-- 5 dummy accounts: `ACC1001–ACC1005 / pass123`, each starting at ৳5000
-- 3 banks mapped: National Bank, City Bank, DBBL
+- 5 dummy accounts with linked cards, each starting at ৳5,000-10,000
+- At least 1 account with a low `daily_limit` (tests `LIMIT_EXCEEDED`)
+- At least 1 `frozen` account (tests `ACCOUNT_FROZEN`)
+- At least 1 expired or `blocked` card (tests `EXPIRED_CARD` / `CARD_BLOCKED`)
 
 #### Deliverable / Handoff Contract
 - Running on `localhost:8001`
-- Postman collection with all endpoints tested
-- Document the `X-API-KEY` value and endpoint request/response shapes for Module 4
+- Postman collection covering **both** the approved path and every decline reason
+- Document the `X-API-KEY` value, the exact request/response JSON shape, and the full list of `decline_reason` values for Module 4
 
 ---
 
-### 🗄️ MODULE 2 — Gateway: Database & Project Setup
+### 🗄️ MODULE 2 — Gateway: Database & Project Setup ✅ done
 **Assigned to:** Member 2
 **Milestone:** M1
 **System:** Payment Gateway (Port 8000)
 
-#### Responsibilities
-- Set up Node/Express project for Payment Gateway
-- Create full Gateway DB schema (based on `db.sql`)
-- Seed reference data (banks, currencies, test merchant)
-- Set up `.env`, DB connection, base routing structure
+Schema, migrations, seed data, `.env`/config, base FastAPI app, logging/error-handling conventions — all built. See `payment-system/README.md` for the actual conventions every other Gateway module must follow (response envelope, pagination, exceptions, logging).
 
-#### Database Tables to Create
-```
-banks, currencies, merchants, users (admin/merchant),
-pos, wallets, transactions, refunds
-```
-
-#### Key Schema Notes
-- `merchants` → has `store_id` (unique) + `api_key` (for Ecommerce auth)
-- `pos` → commission %, fixed_fee, bank_fee, settlement_days per merchant
-- `wallets` → merchant_id, currency_id, balance
-- `transactions` → invoice_id, merchant_id, bank_id, gross, fee, net, status (pending/completed/failed), success_url, fail_url
-- `refunds` → transaction_id, amount, status, created_at
-
-#### Seed Data
-- 2 currencies: BDT, USD
-- 3 banks: National Bank, City Bank, DBBL
-- 1 test merchant: `Merchant One`, store_id: `STORE001`, api_key: `mk_test_12345`
-- POS config for Merchant One: 2% commission + ৳5 fixed fee
-- Admin user: `admin@gateway.com / admin123`
-
-#### Deliverable / Handoff Contract
-- DB migrations + seed files ready and documented
-- `.env.example` with all required config vars
-- Base Express app running on `localhost:8000` with a `GET /health` endpoint
-- Share DB schema diagram / table docs with Modules 3, 4, 5
+One known follow-up for whoever picks up Module 4: the `transactions` table will likely need a `decline_reason` (and possibly `bank_reference`) column added once the charge flow is implemented — flag it here rather than silently bolting it on, so it goes through a proper migration.
 
 ---
 
@@ -116,8 +110,8 @@ pos, wallets, transactions, refunds
 #### Responsibilities
 - Merchant registration & login (JWT-based session)
 - Admin login
-- Middleware: validate `store_id` + `api_key` for Ecommerce-facing endpoints
-- Middleware: validate `X-API-KEY` for internal/admin endpoints
+- Middleware/dependency: validate `store_id` + merchant API key for Ecommerce-facing endpoints
+- Middleware/dependency: validate `X-API-KEY` for internal/admin endpoints
 
 #### API Endpoints to Build
 | Method | Endpoint | Description |
@@ -127,15 +121,17 @@ pos, wallets, transactions, refunds
 | `POST` | `/api/admin/login` | Admin login → JWT token |
 | `GET` | `/api/merchant/profile` | Get merchant info (auth required) |
 
-#### Middleware
-- `authenticateMerchant` — validates JWT for merchant routes
-- `authenticateAdmin` — validates JWT for admin routes
-- `validateApiKey` — validates `store_id` + `api_key` header for checkout init (used by Module 5)
+#### Dependencies (FastAPI-style, not Express middleware)
+- `get_current_merchant` — validates JWT for merchant routes
+- `get_current_admin` — validates JWT for admin routes
+- `verify_merchant_api_key` — validates `store_id` + API key for checkout init (used by Module 4)
+
+Use the response envelope and exceptions from `app.core.utils` (see `payment-system/README.md`) — don't invent a different auth error shape.
 
 #### Deliverable / Handoff Contract
-- All auth endpoints tested via Postman
-- Export middleware functions for use by Modules 4 and 5
-- Document JWT secret in `.env`, token format, and middleware usage
+- All auth endpoints tested
+- Export the dependencies for use by Modules 4 and 5
+- Document the JWT secret's `.env` var, token format, and how to use the dependencies
 
 ---
 
@@ -144,54 +140,61 @@ pos, wallets, transactions, refunds
 **Milestone:** M2
 **System:** Payment Gateway (Port 8000)
 
-> **Depends on:** Module 1 (Bank API running), Module 2 (DB ready), Module 3 (Auth middleware)
+> **Depends on:** Module 1 (Bank API running), Module 2 (DB ready), Module 3 (Auth)
 
 #### Responsibilities
-- Hosted checkout page UI (bank selection + account/password form)
-- Full payment processing pipeline (Gateway → Bank System)
+- Hosted checkout page: **card number, expiry, CVV, cardholder name** — no bank selection dropdown (the card determines the issuing bank, the customer doesn't declare it)
+- Full payment processing pipeline (Gateway → Bank System), including every decline path from Module 1
 - Transaction creation and status management
-- Redirect logic (success/fail back to Ecommerce)
+- Redirect logic (success/fail back to Ecommerce), including the decline reason on failure
 
 #### API Endpoints to Build
 | Method | Endpoint | Description |
 |---|---|---|
 | `POST` | `/api/checkout/init` | Ecommerce sends order details → returns `checkout_url` |
-| `GET` | `/checkout/:invoice_id` | Hosted page — show bank list + payment form |
-| `POST` | `/api/checkout/:invoice_id/pay` | Process payment (calls Bank API debit) |
-| `GET` | `/api/transactions/:invoice_id/verify` | Ecommerce verifies payment status |
+| `GET` | `/checkout/{invoice_id}` | Hosted page — card entry form |
+| `POST` | `/api/checkout/{invoice_id}/pay` | Process payment (calls Bank API charge) |
+| `GET` | `/api/transactions/{invoice_id}/verify` | Ecommerce verifies payment status |
 
 #### Checkout Flow Logic
 ```
-1. /api/checkout/init
+1. POST /api/checkout/init
    → validate merchant api_key
-   → create transactions row (status: pending, store invoice_id)
+   → create transactions row (state=Pending, store invoice_id)
    → return { checkout_url: "http://localhost:8000/checkout/{invoice_id}" }
 
-2. GET /checkout/:invoice_id
-   → render HTML page: show bank dropdown (National/City/DBBL), account_number field, password field
+2. GET /checkout/{invoice_id}
+   → render HTML page: card number, expiry, CVV, cardholder name fields
 
-3. POST /api/checkout/:invoice_id/pay
-   → call Bank System: POST /api/auth/login (account_number + password)
-   → call Bank System: POST /api/accounts/:id/debit (amount)
-   → on success:
+3. POST /api/checkout/{invoice_id}/pay
+   → call Bank System: POST /api/cards/charge
+       - idempotency_key = invoice_id  (never regenerate this on retry)
+       - amount = transaction.gross, currency = transaction.currency
+   → on approved:
+       - look up pos row by (bank the Bank System says issued the card, currency)
+         - if no matching pos config exists for that bank+currency, fall back to
+           a default POS row for the currency (agree this default with Module 2/5
+           rather than crashing the checkout)
        - calculate fee from POS config (commission % + fixed fee)
-       - update transaction: status=completed, gross, fee, net
-       - credit merchant wallet: wallet.balance += net
-   → on failure:
-       - update transaction: status=failed
-   → redirect to success_url or fail_url
+       - update transaction: state=Completed, gross, fee, net
+       - credit merchant wallet: wallet.amount += net
+   → on declined:
+       - update transaction: state=Failed, decline_reason=<from Bank System>
+   → redirect to success_url, or fail_url?reason=<decline_reason>
 
-4. GET /api/transactions/:invoice_id/verify
-   → return transaction status + details (for Ecommerce server-side verify)
+4. GET /api/transactions/{invoice_id}/verify
+   → return transaction status + decline_reason (if any) for Ecommerce's
+     server-side verify — never let Ecommerce trust the redirect alone
 ```
 
 #### UI (Minimal)
-- Simple HTML form: bank dropdown, account number input, password input, Pay button
+- Simple HTML form: card number, expiry (MM/YY), CVV, cardholder name, Pay button
+- On decline, show the reason in plain language (e.g. "insufficient funds") — don't just say "payment failed"
 - Basic CSS — clean, readable, no frameworks
 
 #### Deliverable / Handoff Contract
-- Full flow testable end-to-end (init → pay → verify)
-- Share `invoice_id` format and `verify` endpoint response shape with Module 6
+- Full flow testable end-to-end (init → pay → verify), **for both an approved and at least 2 different declined cases** (use Module 1's seeded broken accounts/cards)
+- Share `invoice_id` format and `verify` endpoint response shape (including `decline_reason`) with Module 6
 
 ---
 
@@ -200,11 +203,11 @@ pos, wallets, transactions, refunds
 **Milestone:** M2
 **System:** Payment Gateway (Port 8000)
 
-> **Depends on:** Module 2 (DB), Module 3 (Auth), Module 4 (transactions exist)
+> **Depends on:** Module 2 (DB), Module 3 (Auth), Module 4 (transactions + bank_reference exist)
 
 #### Responsibilities
 - Merchant wallet balance view
-- Refund flow (merchant/admin triggers → Gateway calls Bank credit)
+- Refund flow (merchant/admin triggers → Gateway calls Bank System's refund endpoint, referencing the **original bank transaction**, not just the account)
 - Fee calculation utility (shared with Module 4)
 
 #### API Endpoints to Build
@@ -217,27 +220,32 @@ pos, wallets, transactions, refunds
 #### Refund Flow Logic
 ```
 POST /api/refund { invoice_id, amount }
-  → validate transaction is "completed"
-  → validate refund amount ≤ transaction.gross
-  → call Bank System: POST /api/accounts/:id/credit (amount)
-  → create refunds row
-  → deduct from merchant wallet: wallet.balance -= amount
+  → validate transaction.state == "Completed"
+  → validate refund amount <= (transaction.gross - transaction.refunded_amount)
+  → call Bank System: POST /api/cards/refund
+       - bank_reference = transaction.bank_reference   (ties the refund to the
+         original charge — a real bank won't credit an account for a charge
+         it never made)
+       - idempotency_key = a fresh key per refund attempt, e.g. invoice_id + ":refund:1"
+  → create refunds row (transaction_id, invoice_id, amount, state)
+  → update transaction.refunded_amount += amount
+    (state=Refunded if fully refunded, Partial Refunded otherwise)
+  → deduct from merchant wallet: wallet.amount -= amount
   → return refund status
 ```
 
 #### Fee Calculation (Shared Utility)
-```js
-// utils/fee.js — used by Module 4 and this module
-function calculateFee(gross, pos) {
-  const commission = (gross * pos.commission_percent) / 100;
-  const fee = commission + pos.fixed_fee;
-  const net = gross - fee;
-  return { fee, net };
-}
+```python
+# app/core/utils/fee.py — used by Module 4 and this module
+def calculate_fee(gross: Decimal, pos) -> tuple[Decimal, Decimal]:
+    commission = gross * pos.commission_percentage / 100
+    fee = commission + pos.commission_fixed
+    net = gross - fee
+    return fee, net
 ```
 
 #### Deliverable / Handoff Contract
-- Refund flow tested via Postman
+- Refund flow tested against both a full and a partial refund
 - Fee utility exported and documented for Module 4 to import
 - Wallet balance endpoint ready for Module 7 (admin panel)
 
@@ -251,14 +259,15 @@ function calculateFee(gross, pos) {
 > **Depends on:** Module 4 (checkout init + verify endpoints working)
 
 #### Responsibilities
-- Set up Node/Express project for Ecommerce
+- Set up the Ecommerce project (FastAPI recommended, see Stack above)
 - Products listing page
 - Order creation and checkout trigger
 - Handle Gateway redirect (success/fail)
-- Call Gateway verify endpoint to confirm payment
+- Call Gateway verify endpoint to confirm payment — never trust the redirect alone
+- This app never sees card data — only `order_id`/`amount` and a redirect to the Gateway
 
 #### Database Schema
-```sql
+```
 products  — id, name, price, stock
 orders    — id, product_id, buyer_name, amount, status (pending/paid/failed), invoice_id
 ```
@@ -272,14 +281,14 @@ orders    — id, product_id, buyer_name, amount, status (pending/paid/failed), 
 | `GET` | `/` | Product listing — show 2 products with Buy Now |
 | `POST` | `/orders` | Create order (pending) → call Gateway `checkout/init` → redirect to Gateway checkout URL |
 | `GET` | `/success` | Gateway redirects here → call Gateway `verify` → update order to paid → show success page |
-| `GET` | `/fail` | Gateway redirects here → update order to failed → show fail page |
+| `GET` | `/fail` | Gateway redirects here → call Gateway `verify` → update order to failed → show fail page with the reason |
 
 #### UI (Minimal)
 - Simple product cards, Buy Now button, order confirmation page
 - Plain HTML/CSS — no framework
 
 #### Deliverable / Handoff Contract
-- Full end-to-end purchase flow working
+- Full end-to-end purchase flow working, for both an approved and a declined card
 - Document `success_url` and `fail_url` format for Module 4 testing
 
 ---
@@ -294,21 +303,21 @@ orders    — id, product_id, buyer_name, amount, status (pending/paid/failed), 
 #### Responsibilities
 - Admin login page
 - Dashboard: view all transactions, merchants, banks, wallet balances
-- Simple server-rendered HTML pages (no frontend framework)
+- Simple server-rendered HTML pages (Jinja2, since we're on FastAPI)
 
 #### Pages to Build
 | Route | Description |
 |---|---|
 | `GET /admin/login` | Admin login form |
 | `GET /admin/dashboard` | Overview: total transactions, total volume, merchants count |
-| `GET /admin/transactions` | Table of all transactions (invoice_id, merchant, amount, fee, net, status, date) |
+| `GET /admin/transactions` | Table of all transactions (invoice_id, merchant, amount, fee, net, status, decline_reason, date) |
 | `GET /admin/merchants` | Table of all merchants + wallet balance |
 | `GET /admin/refunds` | Table of all refunds |
 | `GET /admin/banks` | List of integrated banks |
 
 #### API Calls Used (all from Module 4/5)
 - Internal DB queries (admin has direct access to Gateway DB — same service)
-- Render via Express + plain HTML templates (EJS or simple template strings)
+- Render via FastAPI + Jinja2 templates
 
 #### UI (Minimal)
 - Simple table-based layout
@@ -341,9 +350,9 @@ Module 5 ───────────────────────�
 
 | Milestone | Modules | Goal |
 |---|---|---|
-| **M1 — Foundations** | 1, 2, 3 | All 3 projects scaffolded, DB ready, Bank API live, Auth working |
-| **M2 — Core Flow** | 4, 5 | Full payment + refund flow working end-to-end (API level) |
-| **M3 — Full System** | 6, 7 | UI complete, Ecommerce buying works, Admin panel live |
+| **M1 — Foundations** | 1, 2, 3 | All 3 projects scaffolded, DB ready, Bank API live (incl. decline paths), Auth working |
+| **M2 — Core Flow** | 4, 5 | Full card payment + refund flow working end-to-end (API level), including decline handling |
+| **M3 — Full System** | 6, 7 | UI complete, Ecommerce buying works for both approved and declined cards, Admin panel live |
 
 ---
 
@@ -354,52 +363,40 @@ All members must agree on these before M2 starts:
 | Contract | Owner | Consumers |
 |---|---|---|
 | Bank API base URL + `X-API-KEY` value | Module 1 | Module 4 |
-| Gateway DB schema (final) | Module 2 | All Gateway modules |
-| Auth middleware signatures | Module 3 | Modules 4, 5, 7 |
+| `/api/cards/charge` and `/api/cards/refund` request/response shape | Module 1 | Module 4, Module 5 |
+| Full list of `decline_reason` values | Module 1 | Module 4, Module 6, Module 7 |
+| Idempotency key format (recommend: the `invoice_id` itself for charges) | Module 4 | Module 1 |
+| Gateway DB schema (final, incl. any `transactions` columns added for decline handling) | Module 2 | All Gateway modules |
+| Auth dependency signatures | Module 3 | Modules 4, 5, 7 |
 | `checkout/init` request/response shape | Module 4 | Module 6 |
-| `verify` endpoint response shape | Module 4 | Module 6 |
+| `verify` endpoint response shape (incl. `decline_reason`) | Module 4 | Module 6 |
 | `invoice_id` format | Module 4 | All |
 | `success_url` / `fail_url` format | Module 6 | Module 4 |
 
 ---
 
-## Project Folder Structure (Suggested)
+## Project Folder Structure
 
 ```
-internship-payment-project/
-├── bank-system/          ← Module 1
-│   ├── src/
-│   │   ├── routes/
-│   │   ├── controllers/
-│   │   ├── middleware/
-│   │   ├── db/
-│   │   └── app.js
+internship-softrobotics-fahim/
+├── payment-system/       ← Modules 2, 3, 4, 5, 7 (FastAPI — already scaffolded)
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── config.py
+│   │   ├── database.py
+│   │   ├── core/          ← logging, middleware, exceptions, response, pagination
+│   │   ├── models/         ← SQLModel table classes
+│   │   └── routers/
+│   ├── alembic/
 │   ├── .env.example
-│   └── package.json
+│   ├── requirements.txt
+│   └── README.md          ← read this before writing any Gateway code
 │
-├── payment-gateway/      ← Modules 2, 3, 4, 5, 7
-│   ├── src/
-│   │   ├── routes/
-│   │   ├── controllers/
-│   │   ├── middleware/
-│   │   ├── views/        ← checkout + admin HTML pages
-│   │   ├── utils/        ← fee.js, etc.
-│   │   ├── db/
-│   │   └── app.js
-│   ├── .env.example
-│   └── package.json
+├── bank-system/          ← Module 1 (recommended: same FastAPI layout as payment-system)
 │
-└── ecommerce-app/        ← Module 6
-    ├── src/
-    │   ├── routes/
-    │   ├── controllers/
-    │   ├── views/
-    │   ├── db/
-    │   └── app.js
-    ├── .env.example
-    └── package.json
+└── ecommerce-app/        ← Module 6 (recommended: same FastAPI layout as payment-system)
 ```
 
 ---
 
-> **Next Step:** Review this plan, confirm module assignments, then we start scaffolding all 3 projects.
+> **Next Step:** Module 1 and Module 4 agree on the exact `/api/cards/charge` contract (request shape, response shape, full decline reason list) before either starts building — everything downstream depends on it matching exactly.
