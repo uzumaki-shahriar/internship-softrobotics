@@ -1,0 +1,8 @@
+<div class="result-card result-fail">
+  <h1>Payment failed</h1>
+  <p>Your order for <strong><%= order.productName %></strong> could not be completed.</p>
+  <% if (order.declineReason) { %>
+    <p class="muted">Reason: <%= order.declineReason %></p>
+  <% } %>
+  <p><a href="/">&larr; Try again</a></p>
+</div>

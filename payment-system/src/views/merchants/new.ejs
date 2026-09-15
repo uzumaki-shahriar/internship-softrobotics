@@ -1,0 +1,34 @@
+<h1>Add merchant</h1>
+<p class="muted">
+  For admin-assisted onboarding (e.g. a merchant signed up over a call rather than
+  self-registering at <code>POST /api/merchant/register</code>). A temporary password
+  and API key are generated - shown once below - the merchant should log in and the
+  admin should still set their commission on their detail page to activate them.
+</p>
+
+<% if (typeof created !== "undefined" && created) { %>
+  <div class="flash flash-success">
+    <strong><%= created.merchant.name %></strong> (<%= created.merchant.storeId %>) created.<br />
+    Temporary password (give this to the merchant, not shown again): <code style="user-select:all"><%= created.temporaryPassword %></code><br />
+    API key (also not shown again): <code style="user-select:all"><%= created.apiKey %></code>
+  </div>
+  <p><a href="/admin/merchants/<%= created.merchant.id %>">Go to their detail page to set a commission</a></p>
+<% } %>
+
+<% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
+<form method="post" action="/admin/merchants" id="new-merchant-form" novalidate>
+  <label>Owner name
+    <input type="text" name="name" value="<%= values.name || '' %>" required />
+  </label>
+  <label>Email
+    <input type="email" name="email" value="<%= values.email || '' %>" required />
+  </label>
+  <label>Store name
+    <input type="text" name="store_name" value="<%= values.store_name || '' %>" required />
+  </label>
+  <label>Address
+    <input type="text" name="address" value="<%= values.address || '' %>" />
+  </label>
+  <button type="submit">Create merchant</button>
+</form>
+<script src="/js/validation.js"></script>

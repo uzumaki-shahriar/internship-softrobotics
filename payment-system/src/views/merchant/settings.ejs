@@ -1,0 +1,44 @@
+<h1>Settings</h1>
+
+<h2>Store</h2>
+<table>
+  <tbody>
+    <tr><td class="muted">Store ID</td><td><%= merchant.storeId %></td></tr>
+    <tr><td class="muted">Name</td><td><%= merchant.name %></td></tr>
+    <tr><td class="muted">Address</td><td><%= merchant.address || "-" %></td></tr>
+    <tr><td class="muted">Status</td><td><span class="badge badge-<%= merchant.status %>"><%= merchant.status %></span></td></tr>
+  </tbody>
+</table>
+
+<h2>API key</h2>
+<% if (newApiKey) { %>
+  <div class="flash flash-success">
+    New key generated - copy it now, it will not be shown again:<br />
+    <code style="user-select:all"><%= newApiKey %></code>
+  </div>
+<% } %>
+<p class="muted">Current key: <%= merchant.apiKeyPrefix %>... (the rest is never shown again after creation)</p>
+<form method="post" action="/dashboard/settings/api-key/regenerate" class="confirm-form"
+      data-confirm="Regenerate your API key? The old key will stop working immediately.">
+  <button type="submit" class="danger">Regenerate API key</button>
+</form>
+
+<h2>Pricing</h2>
+<% if (merchant.pricingPlans.length === 0) { %>
+  <p class="muted">No pricing plan set yet - an admin sets this when approving your account.</p>
+<% } else { %>
+  <table>
+    <thead><tr><th>Currency</th><th>Commission %</th><th>Fixed fee</th><th>Settlement (days)</th></tr></thead>
+    <tbody>
+      <% merchant.pricingPlans.forEach(function(p) { %>
+        <tr>
+          <td><%= p.currency.code %></td>
+          <td><%= p.commissionPercentage %>%</td>
+          <td><%= p.commissionFixed %></td>
+          <td><%= p.settlementDay %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <p class="muted">Your rate is set by the platform admin, not editable here.</p>
+<% } %>

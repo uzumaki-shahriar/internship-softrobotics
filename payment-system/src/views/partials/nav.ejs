@@ -1,0 +1,14 @@
+<header class="topbar">
+  <div class="brand"><%= appName %></div>
+  <nav>
+    <a href="/admin/dashboard">Dashboard</a>
+    <a href="/admin/merchants">Merchants</a>
+    <a href="/admin/transactions">Transactions</a>
+    <a href="/admin/refunds">Refunds</a>
+    <a href="/admin/banks">Banks</a>
+  </nav>
+  <form action="/admin/logout" method="post" class="logout-form">
+    <span class="muted"><%= adminName %></span>
+    <button type="submit">Log out</button>
+  </form>
+</header>

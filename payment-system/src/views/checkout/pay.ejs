@@ -1,0 +1,41 @@
+<div class="checkout-card">
+  <div class="checkout-header">
+    <div class="merchant-name"><%= transaction.merchant.name %></div>
+    <div class="amount"><%= transaction.currency.symbol %><%= transaction.grossAmount %> <%= transaction.currency.code %></div>
+    <div class="order-id muted">Order <%= transaction.orderId %></div>
+  </div>
+
+  <div class="expiry-note muted" data-expires-at="<%= transaction.expiresAt.toISOString() %>">
+    This payment link expires in <span id="countdown">a few minutes</span>
+  </div>
+
+  <% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
+
+  <form method="post" action="/checkout/<%= transaction.invoiceId %>/pay" id="pay-form" novalidate>
+    <label>Card number
+      <input type="text" name="card_number" inputmode="numeric" autocomplete="cc-number"
+             placeholder="4242 4242 4242 4242" value="<%= values.card_number || '' %>" required />
+    </label>
+    <label>Cardholder name
+      <input type="text" name="card_holder_name" autocomplete="cc-name"
+             value="<%= values.card_holder_name || '' %>" required />
+    </label>
+    <div class="row">
+      <label>Expiry month
+        <input type="number" name="expiry_month" min="1" max="12" placeholder="MM"
+               value="<%= values.expiry_month || '' %>" required />
+      </label>
+      <label>Expiry year
+        <input type="number" name="expiry_year" min="2000" max="2100" placeholder="YYYY"
+               value="<%= values.expiry_year || '' %>" required />
+      </label>
+      <label>CVV
+        <input type="text" name="cvv" inputmode="numeric" autocomplete="cc-csc"
+               placeholder="123" value="<%= values.cvv || '' %>" required />
+      </label>
+    </div>
+    <button type="submit">Pay <%= transaction.currency.symbol %><%= transaction.grossAmount %></button>
+  </form>
+</div>
+<script src="/js/validation.js"></script>
+<script src="/js/countdown.js"></script>

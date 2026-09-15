@@ -1,0 +1,73 @@
+<h1><%= merchant.name %></h1>
+<p class="muted">
+  <%= merchant.storeId %> · <span class="badge badge-<%= merchant.status %>"><%= merchant.status %></span>
+</p>
+
+<% if (merchant.status === "pending") { %>
+  <div class="flash flash-error">
+    Your account is pending admin approval. You have an API key, but checkout/charge
+    requests will be rejected until an admin sets your commission and activates you.
+  </div>
+<% } else if (merchant.status === "suspended") { %>
+  <div class="flash flash-error">
+    Your account has been suspended by an admin. Contact support to be reactivated.
+  </div>
+<% } %>
+
+<div class="stat-grid">
+  <% if (wallets.length === 0) { %>
+    <div class="stat-card">
+      <div class="stat-value">-</div>
+      <div class="stat-label">No wallet yet</div>
+    </div>
+  <% } else { %>
+    <% wallets.forEach(function(w) { %>
+      <div class="stat-card">
+        <div class="stat-value"><%= w.currency.code %> <%= w.balance %></div>
+        <div class="stat-label">Wallet balance</div>
+      </div>
+    <% }) %>
+  <% } %>
+  <div class="stat-card">
+    <div class="stat-value"><%= todayCount %></div>
+    <div class="stat-label">Transactions today</div>
+  </div>
+</div>
+
+<h2>Your rate</h2>
+<% if (merchant.pricingPlans.length === 0) { %>
+  <p class="muted">No pricing plan set yet - an admin sets this when approving your account.</p>
+<% } else { %>
+  <table>
+    <thead><tr><th>Currency</th><th>Commission</th><th>Settlement</th></tr></thead>
+    <tbody>
+      <% merchant.pricingPlans.forEach(function(p) { %>
+        <tr>
+          <td><%= p.currency.code %></td>
+          <td><%= p.commissionPercentage %>% + <%= p.commissionFixed %></td>
+          <td><%= p.settlementDay %> days</td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+<% } %>
+
+<h2>Recent transactions</h2>
+<% if (recentTransactions.length === 0) { %>
+  <p class="muted">No transactions yet.</p>
+<% } else { %>
+  <table>
+    <thead><tr><th>When</th><th>Invoice</th><th>Status</th><th>Amount</th></tr></thead>
+    <tbody>
+      <% recentTransactions.forEach(function(t) { %>
+        <tr>
+          <td><%= t.createdAt.toISOString() %></td>
+          <td><a href="/dashboard/transactions/<%= t.invoiceId %>"><%= t.invoiceId %></a></td>
+          <td><span class="badge badge-<%= t.status %>"><%= t.status %></span></td>
+          <td><%= t.grossAmount %> <%= t.currency.code %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+<% } %>
+<p><a href="/dashboard/transactions">View all transactions</a></p>

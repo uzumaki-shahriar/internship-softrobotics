@@ -1,0 +1,30 @@
+<h1>Dashboard</h1>
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-value"><%= merchantCount %></div>
+    <div class="stat-label">Merchants</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value"><%= pendingCount %></div>
+    <div class="stat-label">Pending approval</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value"><%= todayTx %></div>
+    <div class="stat-label">Transactions today</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value"><%= todayDeclines %></div>
+    <div class="stat-label">Declines today</div>
+  </div>
+  <% Object.keys(balanceByCurrency).forEach(function(code) { %>
+    <div class="stat-card">
+      <div class="stat-value"><%= code %> <%= balanceByCurrency[code].toFixed(2) %></div>
+      <div class="stat-label">Total wallet balance held</div>
+    </div>
+  <% }) %>
+</div>
+<p>
+  <a href="/admin/merchants">View merchants</a> ·
+  <a href="/admin/transactions">View transactions</a> ·
+  <a href="/admin/refunds">View refunds</a>
+</p>

@@ -1,0 +1,19 @@
+<h1>Edit <%= merchant.name %></h1>
+<% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
+<form method="post" action="/admin/merchants/<%= merchant.id %>/edit" id="edit-merchant-form" novalidate>
+  <label>Owner name
+    <input type="text" name="owner_name" value="<%= values.owner_name %>" required />
+  </label>
+  <label>Email
+    <input type="email" name="email" value="<%= values.email %>" required />
+  </label>
+  <label>Store name
+    <input type="text" name="store_name" value="<%= values.store_name %>" required />
+  </label>
+  <label>Address
+    <input type="text" name="address" value="<%= values.address || '' %>" />
+  </label>
+  <button type="submit">Save</button>
+</form>
+<p><a href="/admin/merchants/<%= merchant.id %>">Back to merchant</a></p>
+<script src="/js/validation.js"></script>

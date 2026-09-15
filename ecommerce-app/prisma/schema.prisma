@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderStatus {
+  pending
+  paid
+  failed
+}
+
+// This shop's own merchant credential with the Payment Gateway - obtained
+// by self-registering there (see src/bootstrap.js), not something a human
+// types into .env. Stored here (one row) instead of a config file so the
+// whole stack boots with zero manual setup.
+model ShopConfig {
+  id             Int      @id @default(autoincrement())
+  storeId        String
+  merchantApiKey String
+  createdAt      DateTime @default(now())
+}
+
+model Order {
+  id            Int         @id @default(autoincrement())
+  productId     Int         @map("product_id")
+  productName   String      @map("product_name")
+  buyerName     String      @map("buyer_name")
+  amount        Decimal     @db.Decimal(15, 2)
+  currency      String
+  status        OrderStatus @default(pending)
+  invoiceId     String?     @unique @map("invoice_id")
+  declineReason String?     @map("decline_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("orders")
+}

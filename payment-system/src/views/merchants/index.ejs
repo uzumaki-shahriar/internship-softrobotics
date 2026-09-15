@@ -1,0 +1,28 @@
+<h1>Merchants</h1>
+<p><a href="/admin/merchants/new">+ Add merchant</a></p>
+<table>
+  <thead>
+    <tr><th>Store ID</th><th>Name</th><th>Status</th><th>Pricing plans</th></tr>
+  </thead>
+  <tbody>
+    <% merchants.forEach(function(m) { %>
+      <tr>
+        <td><a href="/admin/merchants/<%= m.id %>"><%= m.storeId %></a></td>
+        <td><%= m.name %></td>
+        <td><span class="badge badge-<%= m.status %>"><%= m.status %></span></td>
+        <td>
+          <% if (m.pricingPlans.length === 0) { %>
+            <span class="muted">none</span>
+          <% } else { %>
+            <% m.pricingPlans.forEach(function(p) { %>
+              <%= p.currency.code %>: <%= p.commissionPercentage %>% + <%= p.commissionFixed %>&nbsp;
+            <% }) %>
+          <% } %>
+        </td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+<% if (pages > 1) { %>
+  <p class="muted">Page <%= page %> of <%= pages %></p>
+<% } %>

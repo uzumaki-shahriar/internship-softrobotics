@@ -1,0 +1,14 @@
+<h1>Banks</h1>
+<p class="muted">Reference data only - the actual Bank System connection (URL + API key) lives in this app's own <code>.env</code>, never in this table.</p>
+<table>
+  <thead><tr><th>Name</th><th>Code</th><th>Status</th></tr></thead>
+  <tbody>
+    <% banks.forEach(function(b) { %>
+      <tr>
+        <td><%= b.name %></td>
+        <td><%= b.code %></td>
+        <td><span class="badge badge-<%= b.status ? 'active' : 'suspended' %>"><%= b.status ? 'active' : 'inactive' %></span></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>

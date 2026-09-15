@@ -1,0 +1,12 @@
+<header class="topbar">
+  <div class="brand"><%= merchantName %></div>
+  <nav>
+    <a href="/dashboard/overview">Overview</a>
+    <a href="/dashboard/transactions">Transactions</a>
+    <a href="/dashboard/refunds">Refunds</a>
+    <a href="/dashboard/settings">Settings</a>
+  </nav>
+  <form action="/dashboard/logout" method="post" class="logout-form">
+    <button type="submit">Log out</button>
+  </form>
+</header>

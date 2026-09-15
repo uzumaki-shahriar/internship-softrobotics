@@ -4,6 +4,7 @@ const { NotFoundError } = require("../../errors");
 const { payoutSchema } = require("../../validators/payout.schema");
 const { validateBody } = require("../../middleware/validate");
 const { payoutToAccount } = require("../../services/payoutService");
+const { annotateOutcome } = require("../../utils/logOutcome");
 
 const router = express.Router();
 
@@ -29,6 +30,7 @@ router.get("/:accountNumber/balance", async (req, res, next) => {
 router.post("/payout", validateBody(payoutSchema), async (req, res, next) => {
   try {
     const result = await payoutToAccount(req.body);
+    annotateOutcome(res, result);
     res.json(result);
   } catch (err) {
     next(err);

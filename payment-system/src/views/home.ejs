@@ -1,0 +1,31 @@
+<div class="home-hero">
+  <h1><%= appName %></h1>
+  <p class="muted">
+    A hosted card payment gateway. Merchants integrate with the API below;
+    customers never see this page - they land on a checkout session created
+    for them.
+  </p>
+
+  <div class="stat-grid">
+    <a class="stat-card home-card" href="/dashboard/login">
+      <div class="stat-value">Merchant dashboard</div>
+      <div class="stat-label">Wallet, transactions, refunds, API key</div>
+    </a>
+    <a class="stat-card home-card" href="/admin/login">
+      <div class="stat-value">Admin panel</div>
+      <div class="stat-label">Approve merchants, set commissions</div>
+    </a>
+  </div>
+
+  <h2>For developers</h2>
+  <table>
+    <thead><tr><th>Endpoint</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>POST /api/merchant/register</code></td><td>Self-service signup - get an API key immediately (starts pending until an admin approves)</td></tr>
+      <tr><td><code>POST /api/checkout/init</code></td><td>Create a hosted checkout session (<code>X-API-KEY</code>)</td></tr>
+      <tr><td><code>GET /api/transactions/:invoice_id/verify</code></td><td>Server-side payment confirmation (<code>X-API-KEY</code>)</td></tr>
+      <tr><td><code>POST /api/refund</code></td><td>Refund a completed transaction (merchant login token)</td></tr>
+    </tbody>
+  </table>
+  <p class="muted">Full API reference and setup: <a href="/docs">README</a>. Status: <a href="/health"><%= status %></a>.</p>
+</div>

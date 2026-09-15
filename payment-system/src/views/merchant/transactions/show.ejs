@@ -1,0 +1,71 @@
+<%
+const remaining = Number(transaction.grossAmount) - Number(transaction.refundedAmount);
+const refundable = ["completed", "partial_refunded"].includes(transaction.status) && remaining > 0;
+%>
+<h1><%= transaction.invoiceId %></h1>
+<p class="muted">
+  Order <%= transaction.orderId %> ·
+  <span class="badge badge-<%= transaction.status %>"><%= transaction.status %></span>
+</p>
+
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-value"><%= transaction.grossAmount %> <%= transaction.currency.code %></div>
+    <div class="stat-label">Gross</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value"><%= transaction.feeAmount %></div>
+    <div class="stat-label">Fee</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value"><%= transaction.netAmount %></div>
+    <div class="stat-label">Net</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value"><%= transaction.refundedAmount %></div>
+    <div class="stat-label">Refunded</div>
+  </div>
+</div>
+
+<table>
+  <thead><tr><th></th><th></th></tr></thead>
+  <tbody>
+    <tr><td class="muted">Decline reason</td><td><%= transaction.declineReason || "-" %></td></tr>
+    <tr><td class="muted">Bank reference</td><td><%= transaction.bankReference || "-" %></td></tr>
+    <tr><td class="muted">Created</td><td><%= transaction.createdAt.toISOString() %></td></tr>
+    <tr><td class="muted">Expires</td><td><%= transaction.expiresAt.toISOString() %></td></tr>
+  </tbody>
+</table>
+
+<% if (refundable) { %>
+  <h2>Issue a refund</h2>
+  <% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
+  <p class="muted">Remaining refundable: <%= remaining.toFixed(2) %> <%= transaction.currency.code %></p>
+  <form method="post" action="/dashboard/transactions/<%= transaction.invoiceId %>/refund" class="confirm-form" data-confirm="Refund this transaction?" novalidate>
+    <label>Amount
+      <input type="number" name="amount" step="0.01" min="0.01" max="<%= remaining %>"
+             value="<%= values.amount || remaining.toFixed(2) %>" required />
+    </label>
+    <button type="submit">Refund</button>
+  </form>
+  <script src="/js/validation.js"></script>
+<% } %>
+
+<h2>Refund history</h2>
+<% if (transaction.refunds.length === 0) { %>
+  <p class="muted">No refunds yet.</p>
+<% } else { %>
+  <table>
+    <thead><tr><th>When</th><th>Amount</th><th>Status</th><th>Bank ref</th></tr></thead>
+    <tbody>
+      <% transaction.refunds.forEach(function(r) { %>
+        <tr>
+          <td><%= r.createdAt.toISOString() %></td>
+          <td><%= r.amount %></td>
+          <td><span class="badge badge-<%= r.status %>"><%= r.status %></span></td>
+          <td><%= r.bankRefundReference || "-" %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+<% } %>

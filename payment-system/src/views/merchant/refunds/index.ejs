@@ -1,0 +1,20 @@
+<h1>Refunds</h1>
+<% if (refunds.length === 0) { %>
+  <p class="muted">No refunds yet.</p>
+<% } else { %>
+  <table>
+    <thead><tr><th>When</th><th>Invoice</th><th>Amount</th><th>Status</th><th>Reason</th><th>Bank ref</th></tr></thead>
+    <tbody>
+      <% refunds.forEach(function(r) { %>
+        <tr>
+          <td><%= r.createdAt.toISOString() %></td>
+          <td><a href="/dashboard/transactions/<%= r.invoiceId %>"><%= r.invoiceId %></a></td>
+          <td><%= r.amount %> <%= r.transaction.currency.code %></td>
+          <td><span class="badge badge-<%= r.status %>"><%= r.status %></span></td>
+          <td><%= r.declineReason || "-" %></td>
+          <td><%= r.bankRefundReference || "-" %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+<% } %>

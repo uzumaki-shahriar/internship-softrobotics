@@ -1,5 +1,4 @@
 const prisma = require("../db");
-const logger = require("../logger");
 const config = require("../config");
 const { generateBankReference } = require("../utils/generators");
 
@@ -42,7 +41,6 @@ async function chargeCard(payload) {
     where: { idempotencyKey: idempotency_key },
   });
   if (existing) {
-    logger.info({ idempotency_key, reference }, "Idempotent replay of charge request");
     return toChargeResult(existing);
   }
 
@@ -62,7 +60,6 @@ async function chargeCard(payload) {
           declineReason: reason,
         },
       });
-      logger.warn({ reason, reference }, "Charge declined");
       return toChargeResult(row);
     };
 
@@ -124,7 +121,6 @@ async function chargeCard(payload) {
         status: "approved",
       },
     });
-    logger.info({ reference, accountId: account.id }, "Charge approved");
     return toChargeResult(row);
   });
 }

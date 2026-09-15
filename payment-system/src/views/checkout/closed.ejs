@@ -1,0 +1,11 @@
+<%
+const copy = {
+  completed: { title: "Payment complete", body: "This order has already been paid." },
+  failed: { title: "Payment failed", body: `This payment was declined${transaction.declineReason ? " (" + transaction.declineReason + ")" : ""}.` },
+  expired: { title: "Payment link expired", body: "This checkout session is no longer valid. Please start a new order." },
+}[transaction.status] || { title: "Session closed", body: "This checkout session can no longer be paid." };
+%>
+<div class="checkout-card checkout-closed">
+  <h1><%= copy.title %></h1>
+  <p><%= copy.body %></p>
+</div>

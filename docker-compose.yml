@@ -15,7 +15,7 @@ services:
       POSTGRES_PASSWORD: postgres
       # Comma-separated - add a name here for every app / extra bank
       # instance that should get its own database on this server.
-      POSTGRES_MULTIPLE_DATABASES: bank_demo,payment_gateway
+      POSTGRES_MULTIPLE_DATABASES: bank_demo,payment_gateway,ecommerce_shop
     volumes:
       # Postgres 18's image stores data in a versioned subdirectory of
       # /var/lib/postgresql (pg_ctlcluster-style), not .../data directly.
@@ -55,7 +55,7 @@ services:
         condition: service_healthy
 
   payment-gateway:
-    build: ./payment-system/backend
+    build: ./payment-system
     restart: unless-stopped
     environment:
       APP_NAME: Payment Gateway
@@ -79,6 +79,35 @@ services:
       postgres:
         condition: service_healthy
       bank-system:
+        condition: service_started
+
+  ecommerce-app:
+    build: ./ecommerce-app
+    restart: unless-stopped
+    environment:
+      APP_NAME: Bookworm Cafe
+      PORT: 3000
+      NODE_ENV: production
+      LOG_LEVEL: info
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ecommerce_shop
+      GATEWAY_BASE_URL: http://payment-gateway:8000
+      GATEWAY_CURRENCY: BDT
+      SHOP_OWNER_NAME: Bookworm Cafe Owner
+      SHOP_OWNER_EMAIL: owner@bookwormcafe.example
+      SHOP_OWNER_PASSWORD: change-me-not-used-day-to-day
+      SHOP_STORE_NAME: Bookworm Cafe
+      SHOP_COMMISSION_PERCENTAGE: 2.5
+      SHOP_COMMISSION_FIXED: 5
+      # Must match payment-gateway's own ADMIN_EMAIL/ADMIN_PASSWORD above -
+      # used once, on first boot, to self-approve as a merchant.
+      GATEWAY_ADMIN_EMAIL: admin@gateway.local
+      GATEWAY_ADMIN_PASSWORD: admin123
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      payment-gateway:
         condition: service_started
 
 volumes:

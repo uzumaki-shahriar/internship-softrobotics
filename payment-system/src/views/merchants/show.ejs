@@ -1,0 +1,94 @@
+<h1><%= merchant.name %></h1>
+<p class="muted">
+  <%= merchant.storeId %> · <%= merchant.address || "no address on file" %> ·
+  <span class="badge badge-<%= merchant.status %>"><%= merchant.status %></span> ·
+  key <%= merchant.apiKeyPrefix %>...
+</p>
+
+<div class="actions">
+  <a href="/admin/merchants/<%= merchant.id %>/edit"><button type="button">Edit</button></a>
+  <% if (merchant.status !== "suspended") { %>
+    <form method="post" action="/admin/merchants/<%= merchant.id %>/suspend" class="confirm-form" data-confirm="Suspend this merchant? They will not be able to process payments.">
+      <button type="submit" class="danger">Suspend</button>
+    </form>
+  <% } else { %>
+    <form method="post" action="/admin/merchants/<%= merchant.id %>/reactivate">
+      <button type="submit">Reactivate</button>
+    </form>
+  <% } %>
+</div>
+
+<h2>Wallets</h2>
+<% if (merchant.wallets.length === 0) { %>
+  <p class="muted">No wallet yet - approve the merchant for a currency below.</p>
+<% } else { %>
+  <div class="stat-grid">
+    <% merchant.wallets.forEach(function(w) { %>
+      <div class="stat-card">
+        <div class="stat-value"><%= w.currency.code %> <%= w.balance %></div>
+        <div class="stat-label">Wallet balance</div>
+      </div>
+    <% }) %>
+  </div>
+<% } %>
+
+<h2>Pricing plans (the "deal")</h2>
+<% if (merchant.pricingPlans.length === 0) { %>
+  <p class="muted">No pricing plan yet - set one below to approve this merchant.</p>
+<% } else { %>
+  <table>
+    <thead><tr><th>Currency</th><th>Commission %</th><th>Fixed fee</th><th>Settlement (days)</th></tr></thead>
+    <tbody>
+      <% merchant.pricingPlans.forEach(function(p) { %>
+        <tr>
+          <td><%= p.currency.code %></td>
+          <td><%= p.commissionPercentage %>%</td>
+          <td><%= p.commissionFixed %></td>
+          <td><%= p.settlementDay %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+<% } %>
+
+<h3>Set / renegotiate a rate</h3>
+<% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
+<form method="post" action="/admin/merchants/<%= merchant.id %>/approve" id="approve-form" novalidate>
+  <label>Currency
+    <select name="currency" required>
+      <% currencies.forEach(function(c) { %>
+        <option value="<%= c.code %>" <%= values.currency === c.code ? "selected" : "" %>><%= c.code %> - <%= c.name %></option>
+      <% }) %>
+    </select>
+  </label>
+  <label>Commission percentage
+    <input type="number" name="commission_percentage" step="0.01" min="0" max="100"
+           value="<%= values.commission_percentage || '2.00' %>" required />
+  </label>
+  <label>Fixed fee
+    <input type="number" name="commission_fixed" step="0.01" min="0"
+           value="<%= values.commission_fixed || '5.00' %>" required />
+  </label>
+  <label>Settlement (days)
+    <input type="number" name="settlement_day" min="0" value="<%= values.settlement_day || '3' %>" required />
+  </label>
+  <button type="submit">Save & activate</button>
+</form>
+<script src="/js/validation.js"></script>
+
+<h2>Recent transactions</h2>
+<table>
+  <thead><tr><th>When</th><th>Invoice</th><th>Status</th><th>Gross</th><th>Fee</th><th>Net</th></tr></thead>
+  <tbody>
+    <% transactions.forEach(function(t) { %>
+      <tr>
+        <td><%= t.createdAt.toISOString() %></td>
+        <td><%= t.invoiceId %></td>
+        <td><span class="badge badge-<%= t.status %>"><%= t.status %></span></td>
+        <td><%= t.grossAmount %> <%= t.currency.code %></td>
+        <td><%= t.feeAmount %></td>
+        <td><%= t.netAmount %></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>

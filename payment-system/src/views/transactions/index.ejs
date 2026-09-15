@@ -1,0 +1,32 @@
+<h1>Transactions</h1>
+<form method="get" class="filter-form">
+  <select name="status" onchange="this.form.submit()">
+    <option value="" <%= statusFilter === "" ? "selected" : "" %>>All</option>
+    <option value="pending" <%= statusFilter === "pending" ? "selected" : "" %>>Pending</option>
+    <option value="completed" <%= statusFilter === "completed" ? "selected" : "" %>>Completed</option>
+    <option value="failed" <%= statusFilter === "failed" ? "selected" : "" %>>Failed</option>
+    <option value="expired" <%= statusFilter === "expired" ? "selected" : "" %>>Expired</option>
+    <option value="refunded" <%= statusFilter === "refunded" ? "selected" : "" %>>Refunded</option>
+    <option value="partial_refunded" <%= statusFilter === "partial_refunded" ? "selected" : "" %>>Partially refunded</option>
+  </select>
+</form>
+<table>
+  <thead>
+    <tr><th>When</th><th>Invoice</th><th>Merchant</th><th>Status</th><th>Gross</th><th>Fee</th><th>Net</th><th>Reason</th><th>Bank ref</th></tr>
+  </thead>
+  <tbody>
+    <% transactions.forEach(function(t) { %>
+      <tr>
+        <td><%= t.createdAt.toISOString() %></td>
+        <td><%= t.invoiceId %></td>
+        <td><a href="/admin/merchants/<%= t.merchant.id %>"><%= t.merchant.storeId %></a></td>
+        <td><span class="badge badge-<%= t.status %>"><%= t.status %></span></td>
+        <td><%= t.grossAmount %> <%= t.currency.code %></td>
+        <td><%= t.feeAmount %></td>
+        <td><%= t.netAmount %></td>
+        <td><%= t.declineReason || "-" %></td>
+        <td><%= t.bankReference || "-" %></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
