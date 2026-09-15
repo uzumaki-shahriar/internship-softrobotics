@@ -108,6 +108,7 @@ def seed() -> None:
                 "user_id": merchant_user.id,
                 "name": "Merchant One",
                 "address": "123 Main Street, Dhaka",
+                "api_key": "mk_live_test1234567890abcdef",
             },
             store_id="STORE1001",
             email="merchant1@example.com",
