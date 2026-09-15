@@ -151,6 +151,31 @@ orders     — id, product_id, buyer_name, amount, status (pending/paid/failed),
 
 ---
 
+## 5a. Provisioning a merchant (manual, on purpose)
+
+The 3 systems are separate, independently-operated businesses in this
+simulation, exactly like a real store and Stripe/SSLCommerz. Nothing in the
+Ecommerce App's code registers it with the Payment Gateway or logs into the
+Gateway's admin panel automatically - a merchant credential is something a
+human obtains, the same way it works for real:
+
+1. Bring up the Bank System and Payment Gateway: `docker compose up -d postgres bank-system payment-gateway`.
+2. Register the shop as a merchant (its own details, its own new login - never anyone else's):
+   ```bash
+   curl -X POST http://localhost:8000/api/merchant/register -H "Content-Type: application/json" \
+     -d '{"name":"Bookworm Cafe Owner","email":"owner@bookwormcafe.example","password":"<choose one>","store_name":"Bookworm Cafe"}'
+   ```
+   This returns an `api_key` (`sk_test_...`) immediately - the merchant is registered but its status is `pending`, and every Gateway API call with that key is rejected until approved.
+3. Log into the Gateway's **own** admin panel at `http://localhost:8000/admin/login` (`admin@gateway.local` / `admin123` from `docker-compose.yml`) and approve the new merchant from the Merchants list, setting its commission. (Or call `POST /api/admin/merchants/:id/approve` directly if you're scripting a test setup.)
+4. Put the `api_key` from step 2 into `ecommerce-app`'s config as `GATEWAY_API_KEY` (in `docker-compose.yml` for Docker, or `.env` for `npm run dev`), then start/restart it: `docker compose up -d --build ecommerce-app`.
+
+Until step 4 is done with a real, approved key, the shop's checkout will
+correctly fail with "This store's payment account is still pending
+approval" rather than silently succeeding - that failure mode is itself
+part of the simulation, not a bug.
+
+---
+
 ## 6. Money flow examples (end-to-end)
 
 **Approved:**

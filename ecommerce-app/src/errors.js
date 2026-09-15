@@ -14,4 +14,15 @@ class NotFoundError extends AppError {
   }
 }
 
-module.exports = { AppError, NotFoundError };
+// Thrown when the Gateway rejects our own X-API-KEY call because this
+// store's merchant account isn't "active" yet - i.e. it registered but is
+// still waiting on the Gateway admin to review and approve it. Same real
+// state as a brand-new Stripe/SSLCommerz merchant whose first live charge
+// attempt is blocked pending verification.
+class MerchantNotApprovedError extends AppError {
+  constructor(message = "This store's payment account is still pending approval") {
+    super(503, message, "MERCHANT_NOT_APPROVED");
+  }
+}
+
+module.exports = { AppError, NotFoundError, MerchantNotApprovedError };

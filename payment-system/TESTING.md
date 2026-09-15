@@ -6,6 +6,31 @@ step shows the exact command and what to expect. Run from a terminal with
 `docker compose up -d` already running at the repo root (both `bank-system`
 and `payment-gateway`).
 
+## Real merchant already running - log in with this, right now
+
+`docker compose up` self-registers **Bookworm Cafe** (the `ecommerce-app`)
+as a real, already-approved merchant the moment it boots (see
+`ecommerce-app/src/bootstrap.js` and the `SHOP_OWNER_*` values in the root
+`docker-compose.yml`) - there is nothing to register or approve by hand for
+it. Log into its live merchant dashboard directly:
+
+| | |
+|---|---|
+| Dashboard URL | http://localhost:8000/dashboard/login |
+| Email | `owner@bookwormcafe.example` |
+| Password | `change-me-not-used-day-to-day` |
+| Store | Bookworm Cafe - approved for BDT at 2.5% + ৳5 fixed commission |
+
+Admin login (approve/edit/suspend merchants, see every transaction): http://localhost:8000/admin/login - `admin@gateway.local` / `admin123`.
+
+Buy something as a real customer first to generate transactions to look at: http://localhost:3000 (the shop itself, port 3000) - check out with any of the one-click test cards on the payment page, then come back to the dashboard/admin above and see it show up.
+
+The sections below additionally walk through the *API* end of things
+(registration, approval, checkout, refunds) using throwaway accounts
+(`test1@example.com` etc.) created on the fly by the script - useful for
+exercising edge cases and the raw HTTP contract, but not needed just to look
+around the dashboards.
+
 Bank System test cards used below (full table + more scenarios: `bank-system/TESTING.md`):
 
 | Holder | Card use |
@@ -181,6 +206,10 @@ INVOICE=$(echo "$INIT" | node -pe "JSON.parse(require('fs').readFileSync(0)).inv
 
 **Open the `checkout_url` from step 3.6 in an actual browser for this section** - curl can hit the page but won't show you the live countdown, inline field-level validation highlighting, or how the closed/expired pages actually look. See "Browser checklist" below.
 
+Every pay submit carries an `attempt_token` hidden field, minted fresh each
+time the pay page is rendered (see section 4.9). Pull it out of the page
+before posting - it's not optional, a missing/stale token is rejected below.
+
 ```bash
 # 4.1 GET the page - expect the card form (curl just for a quick sanity check)
 curl -s $BASE/checkout/$INVOICE | grep -o '<h1>[^<]*</h1>\|action="[^"]*"'
@@ -188,36 +217,48 @@ curl -s $BASE/checkout/$INVOICE | grep -o '<h1>[^<]*</h1>\|action="[^"]*"'
 # 4.2 EDGE CASE: unknown invoice_id -> 404 (HTML error page)
 curl -s -w "\n%{http_code}\n" $BASE/checkout/inv_does_not_exist
 
+# Grab the current attempt_token before every submit below
+TOKEN=$(curl -s -c cj.txt $BASE/checkout/$INVOICE | grep -oE 'name="attempt_token" value="[^"]*"' | sed -E 's/.*value="([^"]*)"/\1/')
+
 # 4.3 EDGE CASE: malformed card number -> 422, form re-rendered with inline error, other fields preserved
-curl -s -X POST $BASE/checkout/$INVOICE/pay \
+curl -s -b cj.txt -X POST $BASE/checkout/$INVOICE/pay \
   --data-urlencode "card_number=abc" --data-urlencode "card_holder_name=Test" \
   --data-urlencode "expiry_month=12" --data-urlencode "expiry_year=2029" --data-urlencode "cvv=123" \
+  --data-urlencode "attempt_token=$TOKEN" \
   | grep -A1 "flash-error"
 
 # 4.4 Pay with John Doe's card (approved) - expect a 302 to success_url
-curl -s -i -X POST $BASE/checkout/$INVOICE/pay \
+curl -s -i -b cj.txt -X POST $BASE/checkout/$INVOICE/pay \
   --data-urlencode "card_number=$JOHN_CARD" --data-urlencode "card_holder_name=John Doe" \
   --data-urlencode "expiry_month=12" --data-urlencode "expiry_year=2029" --data-urlencode "cvv=$JOHN_CVV" \
+  --data-urlencode "attempt_token=$TOKEN" \
   | grep -i location
 
-# 4.5 EDGE CASE: double-submit an already-completed session -> redirects to success_url AGAIN,
-#     does NOT re-charge (check bank-system's request count doesn't move - see bank-system logs)
-curl -s -i -X POST $BASE/checkout/$INVOICE/pay \
+# 4.5 EDGE CASE: double-submit an already-completed session (same token, same everything) ->
+#     redirects to success_url AGAIN, does NOT re-charge (check bank-system's request count
+#     doesn't move - see bank-system logs). This is the "raw resubmit" case the attempt_token
+#     is there to distinguish from an intentional retry (4.9 below).
+curl -s -i -b cj.txt -X POST $BASE/checkout/$INVOICE/pay \
   --data-urlencode "card_number=$JOHN_CARD" --data-urlencode "card_holder_name=John Doe" \
   --data-urlencode "expiry_month=12" --data-urlencode "expiry_year=2029" --data-urlencode "cvv=$JOHN_CVV" \
+  --data-urlencode "attempt_token=$TOKEN" \
   | grep -i location
 
 # 4.6 GET the page for a completed session -> "closed" page, not the form
 curl -s $BASE/checkout/$INVOICE | grep -o '<h1>[^<]*</h1>'
 
-# 4.7 A fresh session, declined card (Jane Smith) -> 302 to fail_url?reason=INSUFFICIENT_FUNDS
+# 4.7 A fresh session, declined card (Jane Smith), still has retries left ->
+#     stays on the SAME session as a 422 re-render, NOT a redirect to fail_url.
+#     See 4.9 for the full retry-then-succeed flow and the attempt cap.
 INIT2=$(curl -s -X POST $BASE/api/checkout/init -H "X-API-KEY: $API_KEY" -H "Content-Type: application/json" \
   -d '{"order_id":"ORD-2","amount":500,"currency":"BDT","success_url":"http://localhost:9999/success","fail_url":"http://localhost:9999/fail"}')
 INVOICE2=$(echo "$INIT2" | node -pe "JSON.parse(require('fs').readFileSync(0)).invoice_id")
-curl -s -i -X POST $BASE/checkout/$INVOICE2/pay \
+TOKEN2=$(curl -s $BASE/checkout/$INVOICE2 | grep -oE 'name="attempt_token" value="[^"]*"' | sed -E 's/.*value="([^"]*)"/\1/')
+curl -s -w "\n%{http_code}\n" -X POST $BASE/checkout/$INVOICE2/pay \
   --data-urlencode "card_number=$JANE_CARD" --data-urlencode "card_holder_name=Jane Smith" \
   --data-urlencode "expiry_month=12" --data-urlencode "expiry_year=2029" --data-urlencode "cvv=$JANE_CVV" \
-  | grep -i location
+  --data-urlencode "attempt_token=$TOKEN2" \
+  | grep -E "flash-error|attempts left|^422"
 
 # 4.8 EDGE CASE: expired session never reaches the Bank System. Backdate one, then try to pay it.
 INIT3=$(curl -s -X POST $BASE/api/checkout/init -H "X-API-KEY: $API_KEY" -H "Content-Type: application/json" \
@@ -226,13 +267,77 @@ INVOICE3=$(echo "$INIT3" | node -pe "JSON.parse(require('fs').readFileSync(0)).i
 docker exec internship-softrobotics-fahim-postgres-1 psql -U postgres -d payment_gateway -c \
   "UPDATE transactions SET expires_at = now() - interval '1 minute' WHERE invoice_id = '$INVOICE3';"
 BANK_CALLS_BEFORE=$(docker logs internship-softrobotics-fahim-bank-system-1 2>&1 | grep -c "cards/charge")
-curl -s $BASE/checkout/$INVOICE3 | grep -o '<h1>[^<]*</h1>'   # -> "Payment link expired"
+TOKEN3=$(curl -s $BASE/checkout/$INVOICE3)   # page will already show "Payment link expired" (lazy-expired on GET)
+echo "$TOKEN3" | grep -o '<h1>[^<]*</h1>'   # -> "Payment link expired"
 curl -s -i -X POST $BASE/checkout/$INVOICE3/pay \
   --data-urlencode "card_number=$JOHN_CARD" --data-urlencode "card_holder_name=John Doe" \
   --data-urlencode "expiry_month=12" --data-urlencode "expiry_year=2029" --data-urlencode "cvv=$JOHN_CVV" \
-  | grep -i location   # -> fail_url?reason=SESSION_EXPIRED
+  --data-urlencode "attempt_token=whatever" \
+  | grep -i location   # -> fail_url?reason=SESSION_EXPIRED (rejected before the token is even checked)
 BANK_CALLS_AFTER=$(docker logs internship-softrobotics-fahim-bank-system-1 2>&1 | grep -c "cards/charge")
 echo "bank charge calls before=$BANK_CALLS_BEFORE after=$BANK_CALLS_AFTER (must be equal)"
+```
+
+### 4.9 Retry with a different card on the SAME session (the actual point of this section)
+
+A decline does **not** end the checkout session. Real hosted checkouts
+(Stripe Checkout, SSLCommerz) let the customer immediately try a different
+card without bouncing them back to the merchant to restart the whole order -
+only an approval, an expiry, a cancel, or exhausting the retry cap
+(`MAX_PAYMENT_ATTEMPTS`, default 3) ends it. Each render of the pay page gets
+a fresh `attempt_token`, used as part of the Bank System idempotency key, so
+a genuine double-submit of the same page (4.5 above) still dedupes correctly
+while an intentional retry is evaluated fresh.
+
+```bash
+INIT5=$(curl -s -X POST $BASE/api/checkout/init -H "X-API-KEY: $API_KEY" -H "Content-Type: application/json" \
+  -d '{"order_id":"ORD-5","amount":500,"currency":"BDT","success_url":"http://localhost:9999/success","fail_url":"http://localhost:9999/fail"}')
+INVOICE5=$(echo "$INIT5" | node -pe "JSON.parse(require('fs').readFileSync(0)).invoice_id")
+
+# Attempt 1: decline with Jane Smith - expect 422, re-rendered form, "2 attempts left"
+T=$(curl -s $BASE/checkout/$INVOICE5 | grep -oE 'name="attempt_token" value="[^"]*"' | sed -E 's/.*value="([^"]*)"/\1/')
+curl -s -X POST $BASE/checkout/$INVOICE5/pay \
+  --data-urlencode "card_number=$JANE_CARD" --data-urlencode "card_holder_name=Jane Smith" \
+  --data-urlencode "expiry_month=12" --data-urlencode "expiry_year=2029" --data-urlencode "cvv=$JANE_CVV" \
+  --data-urlencode "attempt_token=$T" | grep -oE 'name="attempt_token" value="[^"]*"|[0-9] attempt[^)]*'
+
+# Attempt 2: retry with John Doe's approved card, using the NEW token from attempt 1's response -> 302 to success_url
+T=$(curl -s $BASE/checkout/$INVOICE5 | grep -oE 'name="attempt_token" value="[^"]*"' | sed -E 's/.*value="([^"]*)"/\1/')
+curl -s -i -X POST $BASE/checkout/$INVOICE5/pay \
+  --data-urlencode "card_number=$JOHN_CARD" --data-urlencode "card_holder_name=John Doe" \
+  --data-urlencode "expiry_month=12" --data-urlencode "expiry_year=2029" --data-urlencode "cvv=$JOHN_CVV" \
+  --data-urlencode "attempt_token=$T" | grep -i location   # -> success_url
+
+# EDGE CASE: exhaust the cap. Fresh session, decline 3 times in a row with Jane Smith's card -
+# the 3rd decline is TERMINAL: 302 to fail_url?reason=TOO_MANY_ATTEMPTS, session locked for good.
+INIT6=$(curl -s -X POST $BASE/api/checkout/init -H "X-API-KEY: $API_KEY" -H "Content-Type: application/json" \
+  -d '{"order_id":"ORD-6","amount":500,"currency":"BDT","success_url":"http://localhost:9999/success","fail_url":"http://localhost:9999/fail"}')
+INVOICE6=$(echo "$INIT6" | node -pe "JSON.parse(require('fs').readFileSync(0)).invoice_id")
+for i in 1 2 3; do
+  T=$(curl -s $BASE/checkout/$INVOICE6 | grep -oE 'name="attempt_token" value="[^"]*"' | sed -E 's/.*value="([^"]*)"/\1/')
+  curl -s -i -X POST $BASE/checkout/$INVOICE6/pay \
+    --data-urlencode "card_number=$JANE_CARD" --data-urlencode "card_holder_name=Jane Smith" \
+    --data-urlencode "expiry_month=12" --data-urlencode "expiry_year=2029" --data-urlencode "cvv=$JANE_CVV" \
+    --data-urlencode "attempt_token=$T" | grep -iE "^HTTP|location"
+done
+# expect: attempt 1 -> 422, attempt 2 -> 422, attempt 3 -> 302 fail_url?reason=TOO_MANY_ATTEMPTS
+```
+
+### 4.10 Cancel and return to merchant
+
+The pay page has a "Cancel and return to merchant" link/button - the same
+real-world escape hatch as closing a Stripe Checkout tab. Only a still-pending
+session can be cancelled.
+
+```bash
+INIT7=$(curl -s -X POST $BASE/api/checkout/init -H "X-API-KEY: $API_KEY" -H "Content-Type: application/json" \
+  -d '{"order_id":"ORD-7","amount":500,"currency":"BDT","success_url":"http://localhost:9999/success","fail_url":"http://localhost:9999/fail"}')
+INVOICE7=$(echo "$INIT7" | node -pe "JSON.parse(require('fs').readFileSync(0)).invoice_id")
+
+curl -s -i -X POST $BASE/checkout/$INVOICE7/cancel | grep -i location   # -> fail_url?reason=CANCELLED
+
+# EDGE CASE: cancelling an already-resolved session is a no-op redirect, not an error
+curl -s -i -X POST $BASE/checkout/$INVOICE7/cancel | grep -i location   # -> same fail_url?reason=CANCELLED again
 ```
 
 ### Browser checklist (do this manually)
@@ -242,6 +347,10 @@ echo "bank charge calls before=$BANK_CALLS_BEFORE after=$BANK_CALLS_AFTER (must 
 4. Type a 3-digit card number and submit - see the red inline error appear under that field without losing what you typed elsewhere.
 5. Pay with a real test card and confirm the browser actually navigates to `success_url`/`fail_url`.
 6. Reload the page after paying - confirm you see the "already paid" closed page, not the form again.
+7. On a fresh session, pay with a declining card (e.g. Jane Smith) - confirm you STAY on the same checkout page with an inline "Payment declined... you can try a different card" message and an "N attempts left" counter, not a bounce to the merchant's fail page.
+8. From that same declined state, pay again with an approving card (John Doe) - confirm it completes normally.
+9. On another fresh session, decline 3 times in a row - confirm the 3rd decline finally redirects to the merchant's fail page with `reason=TOO_MANY_ATTEMPTS`.
+10. On a fresh session, click "Cancel and return to merchant" - confirm the browser's confirm dialog appears, and accepting redirects to the merchant's fail page with `reason=CANCELLED` (and on the ecommerce app, a friendly "Payment cancelled" message, not "Payment failed").
 
 ---
 
@@ -331,12 +440,16 @@ docker stop internship-softrobotics-fahim-bank-system-1
 INIT4=$(curl -s -X POST $BASE/api/checkout/init -H "X-API-KEY: $API_KEY" -H "Content-Type: application/json" \
   -d '{"order_id":"ORD-4","amount":500,"currency":"BDT","success_url":"http://localhost:9999/success","fail_url":"http://localhost:9999/fail"}')
 INVOICE4=$(echo "$INIT4" | node -pe "JSON.parse(require('fs').readFileSync(0)).invoice_id")
+TOKEN4=$(curl -s $BASE/checkout/$INVOICE4 | grep -oE 'name="attempt_token" value="[^"]*"' | sed -E 's/.*value="([^"]*)"/\1/')
 
-# Expect: redirects to fail_url?reason=GATEWAY_ERROR within ~10s (the fetch timeout), NOT a hang or a 500
-curl -s -i -X POST $BASE/checkout/$INVOICE4/pay \
+# Expect: GATEWAY_ERROR is retryable like any other decline (it's not the customer's fault,
+# but the Gateway can't tell that apart from a bad card without more context) - 422 re-render
+# with attempts left, same as 4.7. Repeat 3x to see it eventually go terminal like 4.9's cap test.
+curl -s -w "\n%{http_code}\n" -X POST $BASE/checkout/$INVOICE4/pay \
   --data-urlencode "card_number=$JOHN_CARD" --data-urlencode "card_holder_name=John Doe" \
   --data-urlencode "expiry_month=12" --data-urlencode "expiry_year=2029" --data-urlencode "cvv=$JOHN_CVV" \
-  | grep -i location
+  --data-urlencode "attempt_token=$TOKEN4" \
+  | grep -E "flash-error|attempts left|^422"
 
 # Bring it back
 docker start internship-softrobotics-fahim-bank-system-1
@@ -370,6 +483,7 @@ Log in at `http://localhost:8000/admin/login` (`admin@gateway.local` / `admin123
 ## Result you should have at the end
 
 - 2 merchants registered (`test1@example.com` approved for BDT, `other@example.com` never approved)
-- One transaction (`$INVOICE`) fully refunded, one declined (`$INVOICE2`), one expired (`$INVOICE3`), one that failed via `GATEWAY_ERROR` (`$INVOICE4`)
+- One transaction (`$INVOICE`) fully refunded, one retried-then-declined (`$INVOICE2`), one expired (`$INVOICE3`), one hitting `GATEWAY_ERROR` (`$INVOICE4`)
+- One session (`$INVOICE5`) declined once then completed on retry with a different card, one (`$INVOICE6`) locked via `TOO_MANY_ATTEMPTS` after 3 declines, one (`$INVOICE7`) customer-cancelled
 - Wallet for `test1@example.com` back near where it started (net of the original ৳15 fee, since that portion is never refunded)
 - Every request in the container logs as exactly one line - `docker logs internship-softrobotics-fahim-payment-gateway-1` should show no duplicate or missing lines for anything above

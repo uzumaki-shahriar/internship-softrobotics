@@ -13,17 +13,6 @@ enum OrderStatus {
   failed
 }
 
-// This shop's own merchant credential with the Payment Gateway - obtained
-// by self-registering there (see src/bootstrap.js), not something a human
-// types into .env. Stored here (one row) instead of a config file so the
-// whole stack boots with zero manual setup.
-model ShopConfig {
-  id             Int      @id @default(autoincrement())
-  storeId        String
-  merchantApiKey String
-  createdAt      DateTime @default(now())
-}
-
 model Order {
   id            Int         @id @default(autoincrement())
   productId     Int         @map("product_id")

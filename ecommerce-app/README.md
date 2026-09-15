@@ -4,14 +4,9 @@ The thin client from `CLAUDE.md`'s payment ecosystem: 2 fixed books, a customer 
 
 ## What makes this different from a typical toy shop
 
-This shop is itself **a merchant of the Payment Gateway** — the same relationship a real bookstore has with Stripe or SSLCommerz. On first boot (`src/bootstrap.js`, run from `docker-entrypoint.sh` before the server starts), it:
+This shop is itself **a merchant of the Payment Gateway** — the same relationship a real bookstore has with Stripe or SSLCommerz. That means it needs a real, Gateway-issued merchant API key before checkout will work.
 
-1. Waits for the Payment Gateway to actually be reachable (container "started" ≠ "ready")
-2. Self-registers as a merchant via `POST /api/merchant/register` (or recovers cleanly if a prior attempt registered but crashed before saving)
-3. Logs in as the Gateway's admin and approves itself with a commission via `POST /api/admin/merchants/:id/approve`
-4. Saves the resulting API key in its own database (`ShopConfig` table) — never in `.env`, never touched again
-
-This means `docker compose up` at the repo root brings up the entire chain — Bank System → Payment Gateway → this shop — with zero manual API key configuration, using the exact same public APIs a real integration would use by hand.
+**Provisioning is manual, on purpose.** There is no code here that registers this shop or logs into the Gateway automatically - the 3 systems are separate, independently-run businesses in this simulation, and nothing should reach across that boundary holding someone else's login. Get a key the same way a real merchant does: register at the Gateway, wait for the Gateway's own admin to approve the account, then paste the issued key into `GATEWAY_API_KEY`. Full step-by-step: root `README.md`'s "Provisioning a merchant" section.
 
 ## Stack
 
@@ -23,6 +18,10 @@ Node.js + Express + EJS + Prisma + PostgreSQL + pino, mirroring `bank-system`/`p
 docker compose up -d --build   # from the repo root
 ```
 
+Checkout will fail with "payment account is still pending approval" until
+you've provisioned a real `GATEWAY_API_KEY` for this service (see root
+`README.md`) - that's expected, not a bug.
+
 - Shop: http://localhost:3000
 - Health: http://localhost:3000/health
 
@@ -32,8 +31,9 @@ docker compose up -d --build   # from the repo root
 docker compose up -d postgres bank-system payment-gateway   # from the repo root
 npm install
 cp .env.example .env
+# provision a real merchant (root README's "Provisioning a merchant"), then
+# put the api_key it gives you into .env as GATEWAY_API_KEY
 npx prisma migrate dev
-node src/bootstrap.js   # one-time - registers + approves this shop
 npm run dev
 ```
 
@@ -46,4 +46,4 @@ npm run dev
 
 ## Schema
 
-`Order` (product, buyer name, amount, status, invoice_id, decline_reason), `ShopConfig` (this shop's own merchant API key, one row).
+`Order` (product, buyer name, amount, status, invoice_id, decline_reason). The merchant API key itself is never stored in this app's database - it lives only in config (`GATEWAY_API_KEY`), the same as `payment-system`'s `BANK_API_KEY`.

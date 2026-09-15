@@ -97,16 +97,15 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ecommerce_shop
       GATEWAY_BASE_URL: http://payment-gateway:8000
       GATEWAY_CURRENCY: BDT
-      SHOP_OWNER_NAME: Bookworm Cafe Owner
-      SHOP_OWNER_EMAIL: owner@bookwormcafe.example
-      SHOP_OWNER_PASSWORD: change-me-not-used-day-to-day
-      SHOP_STORE_NAME: Bookworm Cafe
-      SHOP_COMMISSION_PERCENTAGE: 2.5
-      SHOP_COMMISSION_FIXED: 5
-      # Must match payment-gateway's own ADMIN_EMAIL/ADMIN_PASSWORD above -
-      # used once, on first boot, to self-approve as a merchant.
-      GATEWAY_ADMIN_EMAIL: admin@gateway.local
-      GATEWAY_ADMIN_PASSWORD: admin123
+      # This shop is a separate, independently-run business from the
+      # Payment Gateway in this simulation - there is no code anywhere that
+      # registers it or logs into the Gateway automatically on its behalf.
+      # A human provisions this the same way a real merchant gets a Stripe/
+      # SSLCommerz key: register at the Gateway, get approved by ITS admin,
+      # then paste the issued key here and restart this one service. See
+      # the root README's "Provisioning a merchant" section for the exact
+      # steps. This placeholder will make checkout fail until replaced.
+      GATEWAY_API_KEY: REPLACE_WITH_YOUR_APPROVED_MERCHANT_API_KEY
     ports:
       - "3000:3000"
     depends_on:
