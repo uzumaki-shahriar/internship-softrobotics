@@ -25,6 +25,8 @@ class Transaction(SQLModel, table=True):
     net: Decimal = Field(default=Decimal("0.00"), max_digits=15, decimal_places=2)
     fee: Decimal = Field(default=Decimal("0.00"), max_digits=15, decimal_places=2)
     refunded_amount: Decimal = Field(default=Decimal("0.00"), max_digits=15, decimal_places=2)
+    bank_reference: Optional[str] = Field(default=None, index=True)
+    decline_reason: Optional[str] = None
     pos_id: int = Field(foreign_key="pos.id")
     currency_id: int = Field(foreign_key="currencies.id")
     merchant_id: int = Field(foreign_key="merchants.id")

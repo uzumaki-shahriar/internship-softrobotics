@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     # (sent as X-API-KEY header by trusted callers, e.g. the Bank System)
     GATEWAY_API_KEY: str
 
+    # Bank System integration used by checkout and refund flows.
+    BANK_API_URL: str = "http://localhost:8001"
+    BANK_API_KEY: str
+    GATEWAY_BASE_URL: str = "http://localhost:8000"
+
 
 @lru_cache
 def get_settings() -> Settings:

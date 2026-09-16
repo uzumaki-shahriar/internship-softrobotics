@@ -15,6 +15,9 @@ class Refund(SQLModel, table=True):
     invoice_id: str = Field(index=True)
     transaction_state: TransactionState
     amount: Decimal = Field(max_digits=15, decimal_places=2)
+    idempotency_key: str = Field(unique=True, index=True)
+    bank_reference: Optional[str] = Field(default=None, index=True)
+    decline_reason: Optional[str] = None
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(
