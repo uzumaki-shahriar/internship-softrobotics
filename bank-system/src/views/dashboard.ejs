@@ -1,0 +1,28 @@
+<h1>Dashboard</h1>
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-value"><%= accountCount %></div>
+    <div class="stat-label">Accounts</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value"><%= cardCount %></div>
+    <div class="stat-label">Cards</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value"><%= currency %> <%= totalBalance %></div>
+    <div class="stat-label">Total balance held</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value"><%= todayTx %></div>
+    <div class="stat-label">Transactions today</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value"><%= todayDeclines %></div>
+    <div class="stat-label">Declines today</div>
+  </div>
+</div>
+<p>
+  <a href="/admin/accounts">View accounts</a> ·
+  <a href="/admin/cards">View cards</a> ·
+  <a href="/admin/transactions">View transactions</a>
+</p>

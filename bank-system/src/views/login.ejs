@@ -1,0 +1,15 @@
+<div class="auth-box">
+  <h1><%= bankName %></h1>
+  <p class="muted">Admin sign in</p>
+  <% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
+  <form method="post" action="/admin/login" id="login-form" novalidate>
+    <label>Email
+      <input type="email" name="email" required autofocus />
+    </label>
+    <label>Password
+      <input type="password" name="password" required />
+    </label>
+    <button type="submit">Sign in</button>
+  </form>
+</div>
+<script src="/js/validation.js"></script>

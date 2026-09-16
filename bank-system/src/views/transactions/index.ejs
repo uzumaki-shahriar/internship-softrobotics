@@ -1,0 +1,27 @@
+<h1>Transactions</h1>
+<form method="get" class="filter-form">
+  <select name="status" onchange="this.form.submit()">
+    <option value="" <%= statusFilter === "" ? "selected" : "" %>>All</option>
+    <option value="approved" <%= statusFilter === "approved" ? "selected" : "" %>>Approved</option>
+    <option value="declined" <%= statusFilter === "declined" ? "selected" : "" %>>Declined</option>
+  </select>
+</form>
+<table>
+  <thead>
+    <tr><th>When</th><th>Type</th><th>Amount</th><th>Account</th><th>Status</th><th>Reason</th><th>Bank ref</th><th>Gateway ref</th></tr>
+  </thead>
+  <tbody>
+    <% transactions.forEach(function(t) { %>
+      <tr>
+        <td><%= t.createdAt.toISOString() %></td>
+        <td><%= t.type %></td>
+        <td><%= t.amount %> <%= t.currency %></td>
+        <td><%= t.account ? t.account.accountNumber : "-" %></td>
+        <td><span class="badge badge-<%= t.status %>"><%= t.status %></span></td>
+        <td><%= t.declineReason || "-" %></td>
+        <td><%= t.bankReference %></td>
+        <td><%= t.gatewayReference %></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>

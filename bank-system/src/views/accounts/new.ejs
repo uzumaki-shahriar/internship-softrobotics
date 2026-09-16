@@ -1,0 +1,21 @@
+<h1>New account</h1>
+<% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
+<form method="post" action="/admin/accounts" id="account-form" novalidate>
+  <label>Account type
+    <select name="type">
+      <option value="personal" <%= (values.type || "personal") === "personal" ? "selected" : "" %>>Personal (customer, pays by card)</option>
+      <option value="business" <%= values.type === "business" ? "selected" : "" %>>Business (merchant payout account, no card)</option>
+    </select>
+  </label>
+  <label>Holder name
+    <input type="text" name="holder_name" value="<%= values.holder_name || '' %>" required />
+  </label>
+  <label>Opening balance
+    <input type="number" name="balance" step="0.01" min="0" value="<%= values.balance || 1000 %>" required />
+  </label>
+  <label>Daily limit
+    <input type="number" name="daily_limit" step="0.01" min="0" value="<%= values.daily_limit || 100000 %>" required />
+  </label>
+  <button type="submit">Create account</button>
+</form>
+<script src="/js/validation.js"></script>

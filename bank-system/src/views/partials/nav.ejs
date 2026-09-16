@@ -1,0 +1,13 @@
+<header class="topbar">
+  <div class="brand"><%= bankName %> <span class="muted">(<%= bankCode %>)</span></div>
+  <nav>
+    <a href="/admin/dashboard">Dashboard</a>
+    <a href="/admin/accounts">Accounts</a>
+    <a href="/admin/cards">Cards</a>
+    <a href="/admin/transactions">Transactions</a>
+  </nav>
+  <form action="/admin/logout" method="post" class="logout-form">
+    <span class="muted"><%= adminName %></span>
+    <button type="submit">Log out</button>
+  </form>
+</header>
