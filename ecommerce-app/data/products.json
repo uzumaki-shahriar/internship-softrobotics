@@ -1,16 +1,16 @@
 [
     {
         "id": "PROD101",
-        "name": "Soft Robotics Starter Kit",
+        "name": "Cyberpunk Mechanical Keyboard",
         "price": 500,
-        "description": "High quality pneumatic soft actuator kit for robotics enthusiasts.",
-        "image": "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=500&q=80"
+        "description": "Hot-swappable tactile switches, RGB backlight, and ergonomic aluminum body.",
+        "image": "https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=500&auto=format&fit=crop&q=80"
     },
     {
         "id": "PROD102",
-        "name": "Pneumatic Control Board",
+        "name": "Pro Wireless Gaming Mouse",
         "price": 1200,
-        "description": "Microcontroller driven pressure controller board with USB & Bluetooth.",
-        "image": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=500&q=80"
+        "description": "26k DPI optical sensor, ultra-lightweight design, and 70-hour rechargeable battery.",
+        "image": "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=500&auto=format&fit=crop&q=80"
     }
 ]

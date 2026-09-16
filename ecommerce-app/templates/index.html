@@ -15,6 +15,7 @@
         margin-bottom: 0.5rem;
         background: linear-gradient(135deg, #fff, #94a3b8);
         -webkit-background-clip: text;
+        background-clip: text;
         -webkit-text-fill-color: transparent;
     }
 
@@ -174,7 +175,10 @@
             <p class="product-desc">{{ product.description }}</p>
             <div class="product-footer">
                 <span class="product-price">৳{{ product.price }}</span>
-                <button class="btn btn-primary" onclick="openBuyModal('{{ product.id }}', '{{ product.name }}', {{ product.price }})">Buy Now</button>
+                <button class="btn btn-primary buy-btn" 
+                        data-id="{{ product.id }}" 
+                        data-name="{{ product.name }}" 
+                        data-price="{{ product.price }}">Buy Now</button>
             </div>
         </div>
     </div>
@@ -196,11 +200,11 @@
             </div>
             <div class="form-group">
                 <label>Your Full Name</label>
-                <input type="text" name="buyer_name" class="form-control" value="Rafiq Ahmed" required>
+                <input type="text" name="buyer_name" class="form-control" placeholder="Enter your full name" required>
             </div>
             <div class="form-group">
                 <label>Email Address</label>
-                <input type="email" name="buyer_email" class="form-control" value="rafiq@example.com" required>
+                <input type="email" name="buyer_email" class="form-control" placeholder="name@example.com" required>
             </div>
             <button type="submit" class="btn btn-success" style="width: 100%; margin-top: 0.5rem;">Proceed to Payment</button>
         </form>
@@ -210,6 +214,17 @@
 
 {% block scripts %}
 <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.buy-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const id = this.dataset.id;
+                const name = this.dataset.name;
+                const price = this.dataset.price;
+                openBuyModal(id, name, price);
+            });
+        });
+    });
+
     function openBuyModal(id, name, price) {
         document.getElementById('modalProductId').value = id;
         document.getElementById('modalProductName').innerText = name;
