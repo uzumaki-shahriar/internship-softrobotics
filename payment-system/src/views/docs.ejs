@@ -1,2 +1,64 @@
 <p><a href="/">&larr; Back</a></p>
-<pre class="docs-content"><%= content %></pre>
+
+<div class="docs-content">
+  <h1>Integration guide</h1>
+  <p>Everything a merchant needs to accept payments through this Gateway. Every server-to-server call below is authenticated with your <code>X-API-KEY</code> header unless noted otherwise.</p>
+
+  <h2 id="merchant-onboarding">Merchant onboarding</h2>
+  <p>Every merchant goes through the same 3 steps - there is no fast path:</p>
+  <ol>
+    <li><strong>Register</strong> - <a href="/dashboard/register">create an account</a> (or call <code>POST /api/merchant/register</code> directly if you're scripting a setup). Either way you get a working <code>api_key</code> (<code>sk_test_...</code>) immediately, shown once, and your account starts <code>status: pending</code>.</li>
+    <li><strong>Wait for approval</strong> - every <code>X-API-KEY</code> call is rejected with <code>403</code> until this Gateway's admin reviews your account and assigns a commission. This mirrors real underwriting - a payment platform never lets a brand-new signup move money unreviewed, even in test mode.</li>
+    <li><strong>Go live</strong> - once approved, use the same <code>api_key</code> for checkout, verify, and refund calls below. Check <code>GET /api/merchant/whoami</code> any time to confirm your current status.</li>
+  </ol>
+  <p>Manage your account afterwards from the <a href="/dashboard/login">merchant dashboard</a> - wallet balance, transaction history, refunds, and regenerating your API key if it's ever compromised.</p>
+
+  <h2 id="authentication">Authentication</h2>
+  <table>
+    <thead><tr><th>Header</th><th>Used for</th></tr></thead>
+    <tbody>
+      <tr><td><code>X-API-KEY</code></td><td>Server-to-server calls made by your own backend (checkout, verify, refund)</td></tr>
+      <tr><td><code>Authorization: Bearer &lt;token&gt;</code></td><td>Calls made on your behalf after logging in at <code>/api/merchant/login</code> (profile, wallet, transaction history)</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="api-reference">API reference</h2>
+  <table>
+    <thead><tr><th>Endpoint</th><th>Auth</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>POST /api/merchant/register</code></td><td>-</td><td>Sign up and receive your API key</td></tr>
+      <tr><td><code>POST /api/merchant/login</code></td><td>-</td><td>Get a dashboard access token</td></tr>
+      <tr><td><code>GET /api/merchant/whoami</code></td><td>API key</td><td>Confirm your key and account status</td></tr>
+      <tr><td><code>POST /api/checkout/init</code></td><td>API key</td><td>Create a hosted checkout session for one order</td></tr>
+      <tr><td><code>GET /api/transactions/:invoice_id/verify</code></td><td>API key</td><td>Confirm what actually happened, server-side - never trust the customer's redirect alone</td></tr>
+      <tr><td><code>POST /api/refund</code></td><td>Bearer token</td><td>Refund a completed transaction, in full or in part</td></tr>
+      <tr><td><code>GET /api/merchant/wallet</code></td><td>Bearer token</td><td>Current balance per currency</td></tr>
+      <tr><td><code>GET /api/merchant/transactions</code></td><td>Bearer token</td><td>Paginated transaction history</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="checkout-flow">The checkout flow</h2>
+  <p>Your server calls <code>checkout/init</code> with an amount and your own <code>success_url</code>/<code>fail_url</code>, and gets back a <code>checkout_url</code>. Redirect your customer there - they enter their card on our hosted page, never yours. We redirect them back to whichever URL matches the outcome, with <code>invoice_id</code> (and <code>reason</code> on failure) appended as query parameters.</p>
+  <p><strong>Always call <code>verify</code> before marking an order paid.</strong> A customer can hit your success URL manually without ever paying - the redirect alone is never proof of payment.</p>
+
+  <h3 id="example">Example</h3>
+  <pre><code>curl -X POST https://your-gateway-host/api/checkout/init \
+  -H "X-API-KEY: sk_test_..." -H "Content-Type: application/json" \
+  -d '{
+    "order_id": "ORD-1001",
+    "amount": 500,
+    "currency": "BDT",
+    "success_url": "https://your-shop.example/success",
+    "fail_url": "https://your-shop.example/fail"
+  }'</code></pre>
+
+  <h2 id="decline-reasons">Decline reasons</h2>
+  <p>A failed payment always includes a <code>decline_reason</code> so you can show the customer something useful:</p>
+  <table>
+    <tbody>
+      <tr><td><code>INVALID_CARD</code></td><td><code>EXPIRED_CARD</code></td><td><code>CVV_MISMATCH</code></td><td><code>CARD_BLOCKED</code></td></tr>
+      <tr><td><code>ACCOUNT_FROZEN</code></td><td><code>ACCOUNT_CLOSED</code></td><td><code>INSUFFICIENT_FUNDS</code></td><td><code>LIMIT_EXCEEDED</code></td></tr>
+      <tr><td><code>SESSION_EXPIRED</code></td><td><code>TOO_MANY_ATTEMPTS</code></td><td><code>CANCELLED</code></td><td><code>GATEWAY_ERROR</code></td></tr>
+    </tbody>
+  </table>
+</div>

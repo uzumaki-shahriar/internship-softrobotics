@@ -1,0 +1,20 @@
+<div class="auth-box" style="max-width:480px">
+  <h1>Welcome, <%= merchant.name %></h1>
+  <p class="muted">Your account (<%= email %>) has been created.</p>
+
+  <div class="flash flash-success">
+    Your API key - copy it now, it will not be shown again:<br />
+    <code style="user-select:all;word-break:break-all"><%= apiKey %></code>
+  </div>
+
+  <div class="flash flash-error" style="background:#fff4e0;color:#9a6700">
+    Your account is <strong>pending</strong>. Every <code>X-API-KEY</code> call
+    will be rejected until this Gateway's admin reviews and approves it with
+    a commission - the same review a real payment platform requires before
+    letting a new merchant move money. You can still explore your dashboard
+    in the meantime.
+  </div>
+
+  <p><a href="/dashboard/overview">Continue to your dashboard &rarr;</a></p>
+  <p class="muted">Need the integration steps? See the <a href="/docs">API reference</a>.</p>
+</div>

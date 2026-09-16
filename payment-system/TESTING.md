@@ -6,30 +6,49 @@ step shows the exact command and what to expect. Run from a terminal with
 `docker compose up -d` already running at the repo root (both `bank-system`
 and `payment-gateway`).
 
-## Real merchant already running - log in with this, right now
+## Provision the real Bookworm Cafe merchant first (one-time, manual)
 
-`docker compose up` self-registers **Bookworm Cafe** (the `ecommerce-app`)
-as a real, already-approved merchant the moment it boots (see
-`ecommerce-app/src/bootstrap.js` and the `SHOP_OWNER_*` values in the root
-`docker-compose.yml`) - there is nothing to register or approve by hand for
-it. Log into its live merchant dashboard directly:
+`ecommerce-app` (the shop at port 3000) does **not** register or approve
+itself - the 3 systems are separate businesses in this simulation, so no
+code is allowed to hold another system's admin login. You provision it by
+hand, exactly like a real merchant would sign up with Stripe/SSLCommerz.
+Full steps: root `README.md`'s "Provisioning a merchant" section. Short
+version:
+
+```bash
+# 1. Register (own login, chosen here - not the Gateway's admin's)
+curl -X POST http://localhost:8000/api/merchant/register -H "Content-Type: application/json" \
+  -d '{"name":"Bookworm Cafe Owner","email":"owner@bookwormcafe.example","password":"change-me-please","store_name":"Bookworm Cafe"}'
+# note the returned merchant_id and api_key
+
+# 2. Approve it AS THE GATEWAY'S ADMIN (this is the platform operator's own action)
+ADMIN_TOKEN=$(curl -s -X POST http://localhost:8000/api/admin/login -H "Content-Type: application/json" \
+  -d '{"email":"admin@gateway.local","password":"admin123"}' | node -pe "JSON.parse(require('fs').readFileSync(0)).token")
+curl -X POST http://localhost:8000/api/admin/merchants/<merchant_id>/approve -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" -d '{"currency":"BDT","commission_percentage":2.5,"commission_fixed":5,"settlement_day":3}'
+
+# 3. Put the api_key from step 1 into ecommerce-app's config as GATEWAY_API_KEY,
+#    then: docker compose up -d --build ecommerce-app
+```
+
+Once that's done, log into its live merchant dashboard directly:
 
 | | |
 |---|---|
 | Dashboard URL | http://localhost:8000/dashboard/login |
 | Email | `owner@bookwormcafe.example` |
-| Password | `change-me-not-used-day-to-day` |
+| Password | *whatever you chose in step 1* |
 | Store | Bookworm Cafe - approved for BDT at 2.5% + ৳5 fixed commission |
 
 Admin login (approve/edit/suspend merchants, see every transaction): http://localhost:8000/admin/login - `admin@gateway.local` / `admin123`.
 
-Buy something as a real customer first to generate transactions to look at: http://localhost:3000 (the shop itself, port 3000) - check out with any of the one-click test cards on the payment page, then come back to the dashboard/admin above and see it show up.
+Buy something as a real customer to generate transactions to look at: http://localhost:3000 (the shop itself, port 3000) - check out with any of the one-click test cards on the payment page, then come back to the dashboard/admin above and see it show up.
 
 The sections below additionally walk through the *API* end of things
 (registration, approval, checkout, refunds) using throwaway accounts
 (`test1@example.com` etc.) created on the fly by the script - useful for
-exercising edge cases and the raw HTTP contract, but not needed just to look
-around the dashboards.
+exercising edge cases and the raw HTTP contract, and exactly the same
+mechanics as provisioning Bookworm Cafe above.
 
 Bank System test cards used below (full table + more scenarios: `bank-system/TESTING.md`):
 

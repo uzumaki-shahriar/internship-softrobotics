@@ -2,7 +2,7 @@
 
 The Payment Gateway from `CLAUDE.md`'s payment ecosystem: merchant onboarding, hosted checkout sessions, wallets, refunds. It never stores card data itself — it forwards it server-to-server to the Bank System and never persists it. See root `README.md` (§2 Security & data boundaries) and `TEAM_PLAN.md` for the full cross-system contract.
 
-**Status:** All 5 milestones built — merchant onboarding/credentials, the hosted checkout session, wallet/fee/refund handling, and the admin panel. See `/Users/mohammedsajidulislam/.claude/plans/harmonic-frolicking-pearl.md` for how it was built in stages, and `TESTING.md` for a complete step-by-step verification flow.
+**Status:** All 5 milestones built — merchant onboarding/credentials, the hosted checkout session, wallet/fee/refund handling, and the admin panel. See `TESTING.md` for a complete step-by-step verification flow.
 
 ## Stack
 
@@ -29,6 +29,16 @@ npx prisma migrate dev
 node prisma/seed.js
 npm run dev
 ```
+
+## Merchant onboarding
+
+Every merchant goes through the same 3 steps - there is no fast path, even for a same-owner integration:
+
+1. **Register** — `POST /api/merchant/register` with your business details and a password. Returns a working `api_key` (`sk_test_...`) immediately, and your account starts `status: pending`.
+2. **Wait for approval** — every `X-API-KEY` call is rejected with `403` until this Gateway's admin reviews your account and assigns a commission via `POST /api/admin/merchants/:id/approve` (or the admin panel). This mirrors real underwriting — a payment platform never lets a brand-new signup move real money unreviewed, even in test mode.
+3. **Go live** — once approved, use the same `api_key` for `POST /api/checkout/init`, `GET /api/transactions/:invoice_id/verify`, and `POST /api/refund`. Check `GET /api/merchant/whoami` any time to confirm your current status.
+
+Manage your account afterwards from the [merchant dashboard](/dashboard/login) - wallet balance, transaction history, refunds, and regenerating your API key if it's ever compromised.
 
 ## Environment variables (`.env`)
 

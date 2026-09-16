@@ -160,12 +160,12 @@ Gateway's admin panel automatically - a merchant credential is something a
 human obtains, the same way it works for real:
 
 1. Bring up the Bank System and Payment Gateway: `docker compose up -d postgres bank-system payment-gateway`.
-2. Register the shop as a merchant (its own details, its own new login - never anyone else's):
+2. Register the shop as a merchant (its own details, its own new login - never anyone else's) at `http://localhost:8000/dashboard/register`, or the equivalent API call if you're scripting it:
    ```bash
    curl -X POST http://localhost:8000/api/merchant/register -H "Content-Type: application/json" \
      -d '{"name":"Bookworm Cafe Owner","email":"owner@bookwormcafe.example","password":"<choose one>","store_name":"Bookworm Cafe"}'
    ```
-   This returns an `api_key` (`sk_test_...`) immediately - the merchant is registered but its status is `pending`, and every Gateway API call with that key is rejected until approved.
+   Either way you get an `api_key` (`sk_test_...`) immediately, shown once - the merchant is registered but its status is `pending`, and every Gateway API call with that key is rejected until approved.
 3. Log into the Gateway's **own** admin panel at `http://localhost:8000/admin/login` (`admin@gateway.local` / `admin123` from `docker-compose.yml`) and approve the new merchant from the Merchants list, setting its commission. (Or call `POST /api/admin/merchants/:id/approve` directly if you're scripting a test setup.)
 4. Put the `api_key` from step 2 into `ecommerce-app`'s config as `GATEWAY_API_KEY` (in `docker-compose.yml` for Docker, or `.env` for `npm run dev`), then start/restart it: `docker compose up -d --build ecommerce-app`.
 

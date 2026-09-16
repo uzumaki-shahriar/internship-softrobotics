@@ -1,14 +1,15 @@
 const express = require("express");
-const fs = require("fs");
-const path = require("path");
 
 const router = express.Router();
 
-const README_PATH = path.join(__dirname, "..", "..", "README.md");
-
+// Hand-authored API reference for merchants integrating with this Gateway -
+// deliberately NOT the repo's README.md. That file is an internal
+// engineering doc (milestones, Docker internals, schema field notes) never
+// meant for a client-facing audience; this page shows only what an
+// integrating merchant actually needs, the same separation a real payment
+// gateway keeps between its public docs site and its own engineering repo.
 router.get("/", (req, res) => {
-  const content = fs.readFileSync(README_PATH, "utf-8");
-  res.render("docs", { content });
+  res.render("docs");
 });
 
 module.exports = router;

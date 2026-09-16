@@ -1,0 +1,28 @@
+<div class="auth-box">
+  <h1><%= appName %></h1>
+  <p class="muted">Create a merchant account</p>
+  <% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
+  <form method="post" action="/dashboard/register" id="register-form" novalidate>
+    <label>Your name
+      <input type="text" name="name" value="<%= values.name || '' %>" required autofocus />
+    </label>
+    <label>Store name
+      <input type="text" name="store_name" value="<%= values.store_name || '' %>" required />
+    </label>
+    <label>Business address <span class="muted">(optional)</span>
+      <input type="text" name="address" value="<%= values.address || '' %>" />
+    </label>
+    <label>Email
+      <input type="email" name="email" value="<%= values.email || '' %>" required />
+    </label>
+    <label>Password
+      <input type="password" name="password" minlength="8" required />
+      <span class="muted" style="font-size:12px">At least 8 characters</span>
+    </label>
+    <button type="submit">Create account</button>
+  </form>
+  <p class="muted" style="margin-top:16px">
+    Already have an account? <a href="/dashboard/login">Sign in</a>.
+  </p>
+</div>
+<script src="/js/validation.js"></script>

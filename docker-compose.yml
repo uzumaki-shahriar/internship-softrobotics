@@ -105,7 +105,7 @@ services:
       # then paste the issued key here and restart this one service. See
       # the root README's "Provisioning a merchant" section for the exact
       # steps. This placeholder will make checkout fail until replaced.
-      GATEWAY_API_KEY: REPLACE_WITH_YOUR_APPROVED_MERCHANT_API_KEY
+      GATEWAY_API_KEY: sk_test_-_8Flp5c1bys4ohITrEGuYTC0ZBu1tz1
     ports:
       - "3000:3000"
     depends_on:
