@@ -1,0 +1,12 @@
+<div class="result-card result-success">
+  <h1>Order confirmed 🎉</h1>
+  <% if (order.status === "paid") { %>
+    <p>Thanks, <%= order.buyerName %>! Your order for <strong><%= order.productName %></strong> is paid.</p>
+    <p class="muted">Order #<%= order.id %> · <%= order.amount %> <%= order.currency %></p>
+  <% } else { %>
+    <p>We're still confirming this payment with our provider - it wasn't actually
+       completed yet (status: <%= order.status %>). Please don't refresh and try again;
+       if this persists, contact support.</p>
+  <% } %>
+  <p><a href="/">&larr; Back to shop</a></p>
+</div>

@@ -1,0 +1,18 @@
+<h1>Books</h1>
+<p class="muted">Two books, one checkout - pay by card via our payment provider.</p>
+
+<div class="product-grid">
+  <% products.forEach(function(p) { %>
+    <div class="product-card">
+      <div class="product-name"><%= p.name %></div>
+      <div class="product-price"><%= p.price %> <%= currency %></div>
+      <form method="post" action="/orders">
+        <input type="hidden" name="product_id" value="<%= p.id %>" />
+        <label>Your name
+          <input type="text" name="buyer_name" placeholder="e.g. Alex" required />
+        </label>
+        <button type="submit">Buy now</button>
+      </form>
+    </div>
+  <% }) %>
+</div>
