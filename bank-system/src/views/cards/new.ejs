@@ -1,0 +1,24 @@
+<h1>New card</h1>
+<% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
+<form method="post" action="/admin/cards" id="card-form" novalidate>
+  <label>Account
+    <select name="account_id" required>
+      <option value="" disabled selected>Select an account</option>
+      <% accounts.forEach(function(a) { %>
+        <option value="<%= a.id %>"><%= a.accountNumber %> - <%= a.holderName %></option>
+      <% }) %>
+    </select>
+  </label>
+  <label>Cardholder name
+    <input type="text" name="card_holder_name" value="<%= values.card_holder_name || '' %>" required />
+  </label>
+  <label>Expiry month
+    <input type="number" name="expiry_month" min="1" max="12" value="<%= values.expiry_month || '' %>" required />
+  </label>
+  <label>Expiry year
+    <input type="number" name="expiry_year" min="<%= new Date().getFullYear() %>" value="<%= values.expiry_year || (new Date().getFullYear() + 3) %>" required />
+  </label>
+  <p class="muted">Card number and CVV are generated automatically.</p>
+  <button type="submit">Create card</button>
+</form>
+<script src="/js/validation.js"></script>

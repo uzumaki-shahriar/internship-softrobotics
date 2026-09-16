@@ -1,0 +1,22 @@
+<h1>Accounts</h1>
+<p><a href="/admin/accounts/new">+ New account</a></p>
+<table>
+  <thead>
+    <tr>
+      <th>Account #</th><th>Holder</th><th>Type</th><th>Balance</th><th>Daily limit</th><th>Status</th><th>Cards</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% accounts.forEach(function(a) { %>
+      <tr>
+        <td><a href="/admin/accounts/<%= a.id %>"><%= a.accountNumber %></a></td>
+        <td><%= a.holderName %></td>
+        <td><%= a.type %></td>
+        <td><%= a.balance %></td>
+        <td><%= a.dailyLimit %></td>
+        <td><span class="badge badge-<%= a.status %>"><%= a.status %></span></td>
+        <td><%= a.cards.length %></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>

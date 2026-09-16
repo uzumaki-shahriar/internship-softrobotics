@@ -1,0 +1,29 @@
+<h1>Cards</h1>
+<p><a href="/admin/cards/new">+ New card</a></p>
+<table>
+  <thead>
+    <tr><th>Card number</th><th>Holder</th><th>Account</th><th>Expiry</th><th>Status</th><th></th></tr>
+  </thead>
+  <tbody>
+    <% cards.forEach(function(c) { %>
+      <tr>
+        <td><%= c.cardNumber.replace(/\d(?=\d{4})/g, "*") %></td>
+        <td><%= c.cardHolderName %></td>
+        <td><a href="/admin/accounts/<%= c.account.id %>"><%= c.account.accountNumber %></a></td>
+        <td><%= String(c.expiryMonth).padStart(2, "0") %>/<%= c.expiryYear %></td>
+        <td><span class="badge badge-<%= c.status %>"><%= c.status %></span></td>
+        <td>
+          <% if (c.status === "active") { %>
+            <form method="post" action="/admin/cards/<%= c.id %>/block" class="confirm-form" data-confirm="Block this card?">
+              <button type="submit">Block</button>
+            </form>
+          <% } else { %>
+            <form method="post" action="/admin/cards/<%= c.id %>/unblock">
+              <button type="submit">Unblock</button>
+            </form>
+          <% } %>
+        </td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
