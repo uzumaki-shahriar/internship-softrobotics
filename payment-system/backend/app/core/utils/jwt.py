@@ -11,7 +11,6 @@ import jwt
 
 from app.config import settings
 
-
 def create_access_token(user_id: int, user_type: str) -> str:
     """Create a signed JWT token for a user.
 
@@ -30,10 +29,9 @@ def create_access_token(user_id: int, user_type: str) -> str:
     }
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
 
-
 def decode_access_token(token: str) -> dict:
     """Decode and validate a JWT token.
-
+    
     Args:
         token: The raw JWT string (without the ``Bearer`` prefix).
 
