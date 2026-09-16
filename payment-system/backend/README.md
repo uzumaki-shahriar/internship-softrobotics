@@ -15,6 +15,27 @@ cp .env.example .env             # then fill in your local DATABASE_URL
 uvicorn app.main:app --reload
 ```
 
+### Running with Docker Compose (local orchestration)
+
+From the repository root you can start Postgres + Gateway + Bank + Shop for local testing:
+
+```bash
+docker-compose up --build
+```
+
+Gateway: http://localhost:8000
+Bank: http://localhost:8001
+Shop: http://localhost:8002
+
+### Running tests
+
+Install dev requirements and run pytest from `payment-system/backend`:
+
+```bash
+pip install -r dev-requirements.txt
+pytest -q
+```
+
 `DATABASE_URL` has no default in `app/config.py` on purpose — the app
 refuses to start without it rather than silently falling back to something
 wrong. Create the Postgres database yourself first (`createdb payment_gateway`
@@ -123,7 +144,11 @@ Every error response has this shape, whether it came from your code, a 404,
 or a genuine unhandled bug:
 
 ```json
-{ "success": false, "error": { "code": "NOT_FOUND", "message": "Merchant not found" }, "status_code": 404 }
+{
+  "success": false,
+  "error": { "code": "NOT_FOUND", "message": "Merchant not found" },
+  "status_code": 404
+}
 ```
 
 Don't add another `try/except` around your route to catch-and-log unexpected

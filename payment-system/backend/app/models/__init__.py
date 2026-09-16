@@ -6,6 +6,7 @@ from app.models.refund import Refund
 from app.models.transaction import Transaction, TransactionState
 from app.models.user import User, UserType
 from app.models.wallet import Wallet
+from app.models.settlement import Settlement, SettlementItem
 
 __all__ = [
     "Bank",
@@ -18,4 +19,6 @@ __all__ = [
     "User",
     "UserType",
     "Wallet",
+    "Settlement",
+    "SettlementItem",
 ]

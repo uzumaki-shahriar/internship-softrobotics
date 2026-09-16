@@ -1,0 +1,41 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: gatewaydb
+      POSTGRES_USER: gateway
+      POSTGRES_PASSWORD: gateway
+    ports:
+      - '5432:5432'
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  gateway:
+    build:
+      context: ./payment-system/backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://gateway:gateway@db:5432/gatewaydb
+      APP_ENV: development
+    depends_on:
+      - db
+    ports:
+      - '8000:8000'
+
+  bank:
+    build:
+      context: ./payment-system/bank
+      dockerfile: Dockerfile
+    ports:
+      - '8001:8001'
+
+  shop:
+    build:
+      context: ./payment-system/shop
+      dockerfile: Dockerfile
+    ports:
+      - '8002:8002'
+
+volumes:
+  db_data:
