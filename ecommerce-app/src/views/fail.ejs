@@ -1,0 +1,17 @@
+<% const reason = order.declineReason || reason; %>
+<% if (reason === "CANCELLED") { %>
+<div class="result-card result-fail">
+  <h1>Payment cancelled</h1>
+  <p>You cancelled checkout for <strong><%= order.productName %></strong>. You were not charged.</p>
+  <p><a href="/">&larr; Back to shop</a></p>
+</div>
+<% } else { %>
+<div class="result-card result-fail">
+  <h1>Payment failed</h1>
+  <p>Your order for <strong><%= order.productName %></strong> could not be completed.</p>
+  <% if (reason) { %>
+    <p class="muted">Reason: <%= reason %></p>
+  <% } %>
+  <p><a href="/">&larr; Try again</a></p>
+</div>
+<% } %>
