@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: payment_gateway
+    ports:
+      # Host port 5433 avoids clashing with a locally installed Postgres on 5432.
+      # The app container still talks to this service over the internal docker
+      # network as `db:5432`, so this only affects connections from your host.
+      - '5433:5432'
+    volumes:
+      - db_data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d payment_gateway']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:password@db:5432/payment_gateway
+      PORT: 3000
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - '3000:3000'
+
+volumes:
+  db_data:

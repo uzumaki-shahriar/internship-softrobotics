@@ -1,0 +1,59 @@
+<%- include('../partials/header', { title: config.label }) %>
+<div class="page-header">
+  <h1><%= config.label %></h1>
+  <a class="btn btn-primary" href="/<%= config.route %>/new">+ New <%= config.label.replace(/s$/, '') %></a>
+</div>
+
+<% if (typeof error !== 'undefined' && error) { %>
+  <div class="alert alert-error"><%= error %></div>
+<% } %>
+
+<div class="table-wrap">
+  <table class="table">
+    <thead>
+      <tr>
+        <% config.listFields.forEach(fname => {
+             const f = config.fields.find(x => x.name === fname);
+             const label = f ? f.label : (fname === 'id' ? 'ID' : fname);
+        %>
+          <th><%= label %></th>
+        <% }) %>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% rows.forEach(row => { %>
+        <tr>
+          <% config.listFields.forEach(fname => {
+               const f = config.fields.find(x => x.name === fname);
+               let value;
+               if (fname === 'id') {
+                 value = row.id;
+               } else if (f && f.type === 'relation') {
+                 value = row[f.relation] ? f.display(row[f.relation]) : '-';
+               } else if (f && f.type === 'select') {
+                 const opt = f.options.find(o => String(o.value) === String(row[fname]));
+                 value = opt ? opt.label : row[fname];
+               } else if (f && f.type === 'password') {
+                 value = '••••••';
+               } else {
+                 value = row[fname];
+               }
+          %>
+            <td><%= value %></td>
+          <% }) %>
+          <td class="actions">
+            <a href="/<%= config.route %>/<%= row.id %>/edit">Edit</a>
+            <form action="/<%= config.route %>/<%= row.id %>?_method=DELETE" method="POST" onsubmit="return confirm('Delete this record?')">
+              <button type="submit" class="link-danger">Delete</button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+      <% if (rows.length === 0) { %>
+        <tr><td colspan="<%= config.listFields.length + 1 %>" class="empty">No records found.</td></tr>
+      <% } %>
+    </tbody>
+  </table>
+</div>
+<%- include('../partials/footer') %>

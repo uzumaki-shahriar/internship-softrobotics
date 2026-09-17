@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= typeof title !== 'undefined' ? title + ' · Payment Gateway Admin' : 'Payment Gateway Admin' %></title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="brand">Payment Gateway Admin</a>
+    <div class="nav-links">
+      <% navConfigs.forEach(c => { %>
+        <a href="/<%= c.route %>"><%= c.label %></a>
+      <% }) %>
+    </div>
+  </nav>
+  <main class="container">

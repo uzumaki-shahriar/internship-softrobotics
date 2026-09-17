@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TransactionState {
+  Completed
+  Pending
+  Refunded
+  PartialRefunded @map("Partial Refunded")
+  Failed
+}
+
+model User {
+  id         Int       @id @default(autoincrement())
+  name       String    @db.VarChar(255)
+  user_type  Int
+  status     Int       @default(1)
+  email      String    @unique @db.VarChar(255)
+  password   String    @db.VarChar(255)
+  created_at DateTime? @default(now())
+  updated_at DateTime? @updatedAt
+
+  merchants Merchant[]
+  wallets   Wallet[]
+
+  @@map("users")
+}
+
+model Merchant {
+  id         Int       @id @default(autoincrement())
+  user_id    Int
+  store_id   String    @unique @db.VarChar(255)
+  name       String    @db.VarChar(255)
+  email      String    @unique @db.VarChar(255)
+  address    String?   @db.Text
+  status     Int       @default(1)
+  created_at DateTime? @default(now())
+  updated_at DateTime? @updatedAt
+
+  user         User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@map("merchants")
+}
+
+model Currency {
+  id         Int       @id @default(autoincrement())
+  name       String    @db.VarChar(255)
+  symbol     String    @db.VarChar(10)
+  code       String    @unique @db.VarChar(5)
+  created_at DateTime? @default(now())
+  updated_at DateTime? @updatedAt
+
+  pos          Pos[]
+  transactions Transaction[]
+  wallets      Wallet[]
+
+  @@map("currencies")
+}
+
+model Bank {
+  id            Int       @id @default(autoincrement())
+  name          String    @db.VarChar(255)
+  issuer_name   String    @db.VarChar(255)
+  api_url       String?   @db.VarChar(255)
+  user_name     String    @db.VarChar(255)
+  user_password String    @db.VarChar(255)
+  status        Int       @default(1)
+  code          String?   @db.VarChar(255)
+  branch        String?   @db.VarChar(255)
+  created_at    DateTime? @default(now())
+  updated_at    DateTime? @updatedAt
+
+  pos Pos[]
+
+  @@map("banks")
+}
+
+model Pos {
+  id                    Int       @id @default(autoincrement())
+  name                  String    @db.VarChar(255)
+  bank_id               Int
+  currency_id           Int
+  status                Int       @default(1)
+  commission_percentage Float     @default(0)
+  commission_fixed      Float     @default(0)
+  bank_fee              Float     @default(0)
+  settlement_day        Int       @default(0)
+  created_at            DateTime? @default(now())
+  updated_at            DateTime? @updatedAt
+
+  bank         Bank          @relation(fields: [bank_id], references: [id], onDelete: Cascade)
+  currency     Currency      @relation(fields: [currency_id], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@map("pos")
+}
+
+model Transaction {
+  id                Int               @id @default(autoincrement())
+  invoice_id        String            @db.VarChar(255)
+  order_id          String            @db.VarChar(255)
+  transaction_state TransactionState
+  gross             Float
+  net               Float
+  fee               Float             @default(0)
+  refunded_amount   Float             @default(0)
+  pos_id            Int
+  currency_id       Int
+  merchant_id       Int
+  settlement_date   DateTime?         @db.Date
+  created_at        DateTime?         @default(now())
+  updated_at        DateTime?         @updatedAt
+
+  pos      Pos      @relation(fields: [pos_id], references: [id], onDelete: Cascade)
+  currency Currency @relation(fields: [currency_id], references: [id], onDelete: Cascade)
+  merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+  refunds  Refund[]
+
+  @@map("transactions")
+}
+
+model Refund {
+  id                Int               @id @default(autoincrement())
+  transaction_id    Int
+  invoice_id        String            @db.VarChar(255)
+  transaction_state TransactionState
+  amount            Float
+  created_at        DateTime?         @default(now())
+  updated_at        DateTime?         @updatedAt
+
+  transaction Transaction @relation(fields: [transaction_id], references: [id], onDelete: Cascade)
+
+  @@map("refunds")
+}
+
+model Wallet {
+  id          Int       @id @default(autoincrement())
+  user_id     Int
+  currency_id Int
+  amount      Float     @default(0)
+  created_at  DateTime? @default(now())
+  updated_at  DateTime? @updatedAt
+
+  user     User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  currency Currency @relation(fields: [currency_id], references: [id], onDelete: Cascade)
+
+  @@map("wallets")
+}

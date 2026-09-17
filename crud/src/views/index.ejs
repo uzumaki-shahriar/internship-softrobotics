@@ -1,0 +1,12 @@
+<%- include('partials/header', { title: 'Dashboard' }) %>
+<h1>Dashboard</h1>
+<p class="subtitle">Manage all payment gateway resources below.</p>
+<div class="card-grid">
+  <% configs.forEach(c => { %>
+    <a class="card" href="/<%= c.route %>">
+      <h3><%= c.label %></h3>
+      <span>Manage <%= c.label %></span>
+    </a>
+  <% }) %>
+</div>
+<%- include('partials/footer') %>

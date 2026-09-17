@@ -1,0 +1,54 @@
+<%- include('../partials/header', { title: (item && item.id ? 'Edit ' : 'New ') + config.label.replace(/s$/, '') }) %>
+<h1><%= item && item.id ? 'Edit' : 'New' %> <%= config.label.replace(/s$/, '') %></h1>
+
+<% if (typeof error !== 'undefined' && error) { %>
+  <div class="alert alert-error"><%= error %></div>
+<% } %>
+
+<form class="form" action="<%= action %>" method="<%= method %>">
+  <% config.fields.forEach(f => {
+       let value = item ? item[f.name] : '';
+       if (f.type === 'date' && value) { value = new Date(value).toISOString().slice(0, 10); }
+       const isPasswordOnEdit = f.type === 'password' && item && item.id;
+  %>
+    <div class="form-group">
+      <label><%= f.label %><%= f.required ? ' *' : '' %></label>
+
+      <% if (f.type === 'textarea') { %>
+        <textarea name="<%= f.name %>" <%= f.required ? 'required' : '' %>><%= value || '' %></textarea>
+
+      <% } else if (f.type === 'select') { %>
+        <select name="<%= f.name %>" <%= f.required ? 'required' : '' %>>
+          <option value="">-- Select --</option>
+          <% f.options.forEach(o => { %>
+            <option value="<%= o.value %>" <%= String(value) === String(o.value) ? 'selected' : '' %>><%= o.label %></option>
+          <% }) %>
+        </select>
+
+      <% } else if (f.type === 'relation') { %>
+        <select name="<%= f.name %>" <%= f.required ? 'required' : '' %>>
+          <option value="">-- Select --</option>
+          <% options[f.name].forEach(o => { %>
+            <option value="<%= o.value %>" <%= String(value) === String(o.value) ? 'selected' : '' %>><%= o.label %></option>
+          <% }) %>
+        </select>
+
+      <% } else { %>
+        <input
+          type="<%= f.type === 'number' ? 'number' : (f.type === 'password' ? 'password' : (f.type === 'email' ? 'email' : (f.type === 'date' ? 'date' : 'text'))) %>"
+          name="<%= f.name %>"
+          value="<%= f.type === 'password' ? '' : (value || '') %>"
+          <% if (f.step) { %>step="<%= f.step %>"<% } %>
+          <%= f.required && !isPasswordOnEdit ? 'required' : '' %>
+          <% if (isPasswordOnEdit) { %>placeholder="Leave blank to keep current password"<% } %>
+        >
+      <% } %>
+    </div>
+  <% }) %>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a href="/<%= config.route %>" class="btn">Cancel</a>
+  </div>
+</form>
+<%- include('../partials/footer') %>
