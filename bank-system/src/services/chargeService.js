@@ -1,6 +1,8 @@
 const prisma = require("../db");
 const config = require("../config");
-const { generateBankReference } = require("../utils/generators");
+const logger = require("../logger");
+const { NotFoundError } = require("../errors");
+const { generateBankReference, generateOtpCode } = require("../utils/generators");
 
 function toChargeResult(row) {
   if (row.status === "approved") {
@@ -8,6 +10,13 @@ function toChargeResult(row) {
       status: "approved",
       bank_reference: row.bankReference,
       balance_after: row.balanceAfter.toNumber(),
+    };
+  }
+  if (row.status === "pending") {
+    return {
+      status: "otp_required",
+      otp_reference: row.bankReference,
+      expires_at: row.otpChallenge.expiresAt,
     };
   }
   return { status: "declined", decline_reason: row.declineReason };
@@ -33,12 +42,14 @@ async function chargeCard(payload) {
     currency,
     idempotency_key,
     reference,
+    return_url,
   } = payload;
 
   // Idempotency comes first, before any other check: a retried request must
   // get back the exact original outcome, never be re-evaluated.
   const existing = await prisma.bankTransaction.findUnique({
     where: { idempotencyKey: idempotency_key },
+    include: { otpChallenge: true },
   });
   if (existing) {
     return toChargeResult(existing);
@@ -104,9 +115,9 @@ async function chargeCard(payload) {
       return decline("LIMIT_EXCEEDED", account.id, card.id);
     }
 
-    const newBalance = account.balance.minus(amount);
-    await tx.account.update({ where: { id: account.id }, data: { balance: newBalance } });
-
+    // No debit yet - the account isn't touched until the OTP is verified
+    // (see otpService.verifyOtp), same reason the BankTransaction below is
+    // created "pending" instead of "approved".
     const row = await tx.bankTransaction.create({
       data: {
         bankReference: generateBankReference(),
@@ -117,12 +128,48 @@ async function chargeCard(payload) {
         type: "debit",
         amount,
         currency,
-        balanceAfter: newBalance,
-        status: "approved",
+        status: "pending",
       },
     });
-    return toChargeResult(row);
+
+    const code = generateOtpCode();
+    const expiresAt = new Date(Date.now() + config.otpExpiryMinutes * 60 * 1000);
+
+    await tx.otpChallenge.create({
+      data: {
+        transactionId: row.id,
+        code,
+        expiresAt,
+        returnUrl: return_url,
+      },
+    });
+
+    logger.info(
+      `[OTP] charge ${row.bankReference} account=${account.id} code=${code} expires_in=${config.otpExpiryMinutes}m`
+    );
+
+    return {
+      status: "otp_required",
+      otp_reference: row.bankReference,
+      expires_at: expiresAt,
+    };
   });
 }
 
-module.exports = { chargeCard };
+/**
+ * Server-to-server status check the Gateway calls when the customer's
+ * browser bounces back from the Bank's OTP page - it doesn't trust that
+ * redirect alone, it confirms the real outcome here. Same idempotency
+ * lookup chargeCard() does on a retried request, just without requiring
+ * a full card payload to reach it.
+ */
+async function getChargeStatus(idempotency_key) {
+  const existing = await prisma.bankTransaction.findUnique({
+    where: { idempotencyKey: idempotency_key },
+    include: { otpChallenge: true },
+  });
+  if (!existing) throw new NotFoundError("No charge found for this idempotency key");
+  return toChargeResult(existing);
+}
+
+module.exports = { chargeCard, getChargeStatus };

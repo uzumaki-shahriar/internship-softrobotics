@@ -1,0 +1,24 @@
+<div class="auth-box">
+  <h1>Verify your payment</h1>
+  <p><%= challenge.currency %> <%= challenge.amount %> &middot; <%= challenge.maskedCard %></p>
+
+  <% if (typeof resent !== "undefined" && resent) { %>
+    <div class="flash flash-success">A new code has been sent.</div>
+  <% } %>
+  <% if (error) { %>
+    <div class="flash flash-error"><%= error %></div>
+  <% } %>
+
+  <form method="post" action="/otp/<%= challenge.reference %>/verify" novalidate>
+    <label>Enter the 6-digit code sent to your registered device
+      <input type="text" name="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required autofocus />
+    </label>
+    <button type="submit">Verify</button>
+  </form>
+
+  <form method="post" action="/otp/<%= challenge.reference %>/resend">
+    <button type="submit" class="btn-link-muted">Resend code</button>
+  </form>
+
+  <p class="muted">This is a sandbox - no real SMS is sent. Check the Bank System's server logs for the code.</p>
+</div>

@@ -120,6 +120,97 @@ async function cancelSession(invoiceId) {
 }
 
 /**
+ * Already resolved one way or another - don't re-charge, just report
+ * where it landed (handles a double form-submit, or a stale callback,
+ * safely). Returns null when the session is still open for business.
+ */
+function alreadyResolvedResult(transaction) {
+  if (transaction.status === "completed") {
+    return { terminal: true, redirectUrl: successUrlFor(transaction), status: "completed" };
+  }
+  if (transaction.status === "failed" || transaction.status === "expired") {
+    const reason = transaction.declineReason || "FAILED";
+    return { terminal: true, redirectUrl: failUrlWithReason(transaction, reason), status: transaction.status, declineReason: reason };
+  }
+  return null;
+}
+
+/**
+ * Turns a Bank System response (approved / declined / otp_required) into
+ * this session's next step. Shared by payForSession (the initial charge
+ * call) and resolveOtpCallback (the bounce-back from the Bank's OTP page)
+ * since either one can land here.
+ */
+async function applyBankResult(transaction, bankResult) {
+  if (bankResult.status === "otp_required") {
+    // Not resolved yet - send the customer's browser to the Bank's own
+    // challenge page instead of rendering anything ourselves (see
+    // CLAUDE.md: only the Bank ever touches OTP/card data).
+    return {
+      terminal: false,
+      externalRedirect: true,
+      redirectUrl: `${config.bankPublicBaseUrl}/otp/${bankResult.otp_reference}`,
+    };
+  }
+
+  if (bankResult.status === "approved") {
+    const { fee, net } = calculateFee(Number(transaction.grossAmount), transaction.pricingPlan);
+
+    [transaction] = await prisma.$transaction([
+      prisma.transaction.update({
+        where: { id: transaction.id },
+        include: TRANSACTION_INCLUDE,
+        data: {
+          status: "completed",
+          bankReference: bankResult.bank_reference,
+          feeAmount: fee,
+          netAmount: net,
+        },
+      }),
+      prisma.wallet.upsert({
+        where: { merchantId_currencyId: { merchantId: transaction.merchantId, currencyId: transaction.currencyId } },
+        update: { balance: { increment: net } },
+        create: { merchantId: transaction.merchantId, currencyId: transaction.currencyId, balance: net },
+      }),
+    ]);
+    return { terminal: true, redirectUrl: successUrlFor(transaction), status: "completed" };
+  }
+
+  // Declined - whether from a card-level check or from a failed/expired
+  // OTP challenge, both land here the same way.
+  const attemptCount = transaction.attemptCount + 1;
+  const attemptsExhausted = attemptCount >= config.maxPaymentAttempts;
+
+  if (attemptsExhausted) {
+    transaction = await prisma.transaction.update({
+      where: { id: transaction.id },
+      include: TRANSACTION_INCLUDE,
+      data: { status: "failed", declineReason: "TOO_MANY_ATTEMPTS", attemptCount },
+    });
+    return {
+      terminal: true,
+      redirectUrl: failUrlWithReason(transaction, "TOO_MANY_ATTEMPTS"),
+      status: "failed",
+      declineReason: "TOO_MANY_ATTEMPTS",
+    };
+  }
+
+  transaction = await prisma.transaction.update({
+    where: { id: transaction.id },
+    include: TRANSACTION_INCLUDE,
+    data: { declineReason: bankResult.decline_reason, attemptCount },
+  });
+  transaction = await prepareAttempt(transaction);
+  return {
+    terminal: false,
+    transaction,
+    status: "pending",
+    declineReason: bankResult.decline_reason,
+    attemptsRemaining: config.maxPaymentAttempts - attemptCount,
+  };
+}
+
+/**
  * Processes a payment attempt against a checkout session. Never trusts an
  * amount/currency from the request - always the session's own stored
  * values, so a customer can't tamper with the price in their browser.
@@ -133,15 +224,8 @@ async function cancelSession(invoiceId) {
 async function payForSession(invoiceId, cardDetails, submittedToken) {
   let transaction = await findTransaction(invoiceId);
 
-  // Already resolved one way or another - don't re-charge, just report
-  // where it landed (handles a double form-submit safely).
-  if (transaction.status === "completed") {
-    return { terminal: true, redirectUrl: successUrlFor(transaction), status: "completed" };
-  }
-  if (transaction.status === "failed" || transaction.status === "expired") {
-    const reason = transaction.declineReason || "FAILED";
-    return { terminal: true, redirectUrl: failUrlWithReason(transaction, reason), status: transaction.status, declineReason: reason };
-  }
+  const already = alreadyResolvedResult(transaction);
+  if (already) return already;
 
   transaction = await expireIfNeeded(transaction);
   if (transaction.status === "expired") {
@@ -180,61 +264,62 @@ async function payForSession(invoiceId, cardDetails, submittedToken) {
     // previous, different, decline.
     idempotency_key: `${transaction.invoiceId}:${submittedToken}`,
     reference: transaction.invoiceId,
+    // Where the Bank should send the customer's browser back to if it
+    // needs to run them through an OTP challenge - see otp-callback route.
+    return_url: `${config.publicBaseUrl}/checkout/${transaction.invoiceId}/otp-callback`,
   });
 
-  if (bankResult.status === "approved") {
-    const { fee, net } = calculateFee(Number(transaction.grossAmount), transaction.pricingPlan);
+  return applyBankResult(transaction, bankResult);
+}
 
-    [transaction] = await prisma.$transaction([
-      prisma.transaction.update({
-        where: { id: transaction.id },
-        include: TRANSACTION_INCLUDE,
-        data: {
-          status: "completed",
-          bankReference: bankResult.bank_reference,
-          feeAmount: fee,
-          netAmount: net,
-        },
-      }),
-      prisma.wallet.upsert({
-        where: { merchantId_currencyId: { merchantId: transaction.merchantId, currencyId: transaction.currencyId } },
-        update: { balance: { increment: net } },
-        create: { merchantId: transaction.merchantId, currencyId: transaction.currencyId, balance: net },
-      }),
-    ]);
-    return { terminal: true, redirectUrl: successUrlFor(transaction), status: "completed" };
-  }
+/**
+ * Called when the customer's browser bounces back from the Bank's OTP
+ * page. Never trusts that redirect by itself (same rule the ecommerce
+ * app's /success and /fail routes already follow) - re-derives the exact
+ * idempotency key used for the original charge and asks the Bank for the
+ * real, current outcome server-to-server instead.
+ */
+async function resolveOtpCallback(invoiceId) {
+  let transaction = await findTransaction(invoiceId);
 
-  const attemptCount = transaction.attemptCount + 1;
-  const attemptsExhausted = attemptCount >= config.maxPaymentAttempts;
+  const already = alreadyResolvedResult(transaction);
+  if (already) return already;
 
-  if (attemptsExhausted) {
-    transaction = await prisma.transaction.update({
-      where: { id: transaction.id },
-      include: TRANSACTION_INCLUDE,
-      data: { status: "failed", declineReason: "TOO_MANY_ATTEMPTS", attemptCount },
-    });
+  transaction = await expireIfNeeded(transaction);
+  if (transaction.status === "expired") {
     return {
       terminal: true,
-      redirectUrl: failUrlWithReason(transaction, "TOO_MANY_ATTEMPTS"),
-      status: "failed",
-      declineReason: "TOO_MANY_ATTEMPTS",
+      redirectUrl: failUrlWithReason(transaction, "SESSION_EXPIRED"),
+      status: "expired",
+      declineReason: "SESSION_EXPIRED",
     };
   }
 
-  transaction = await prisma.transaction.update({
-    where: { id: transaction.id },
-    include: TRANSACTION_INCLUDE,
-    data: { declineReason: bankResult.decline_reason, attemptCount },
-  });
-  transaction = await prepareAttempt(transaction);
-  return {
-    terminal: false,
-    transaction,
-    status: "pending",
-    declineReason: bankResult.decline_reason,
-    attemptsRemaining: config.maxPaymentAttempts - attemptCount,
-  };
+  if (!transaction.currentAttemptToken) {
+    // No payment attempt was ever in flight for this session - nothing to
+    // resolve (e.g. someone hit this URL directly). Send them back to pay.
+    transaction = await prepareAttempt(transaction);
+    return {
+      terminal: false,
+      transaction,
+      status: "pending",
+      declineReason: null,
+      formError: "Nothing to verify - please try paying again",
+    };
+  }
+
+  const idempotencyKey = `${transaction.invoiceId}:${transaction.currentAttemptToken}`;
+  const bankResult = await bankClient.getChargeStatus(idempotencyKey);
+
+  return applyBankResult(transaction, bankResult);
 }
 
-module.exports = { initCheckout, findTransaction, expireIfNeeded, prepareAttempt, cancelSession, payForSession };
+module.exports = {
+  initCheckout,
+  findTransaction,
+  expireIfNeeded,
+  prepareAttempt,
+  cancelSession,
+  payForSession,
+  resolveOtpCallback,
+};

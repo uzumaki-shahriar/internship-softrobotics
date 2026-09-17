@@ -10,6 +10,11 @@ const chargeSchema = z.object({
   currency: z.string().trim().length(3),
   idempotency_key: z.string().trim().min(1),
   reference: z.string().trim().min(1),
+  // Where to send the customer's browser back to once an OTP challenge
+  // (if one is needed) resolves - see otpService.js. Always sent, even
+  // though most charges never trigger OTP, since the bank can't know in
+  // advance whether this card will need it.
+  return_url: z.string().trim().url(),
 });
 
 module.exports = { chargeSchema };

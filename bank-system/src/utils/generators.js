@@ -54,9 +54,14 @@ function generateBankReference() {
   return `TXN-${config.bankCode}-${Date.now().toString(36).toUpperCase()}-${randomDigits(4)}`;
 }
 
+function generateOtpCode() {
+  return randomDigits(6);
+}
+
 module.exports = {
   generateCardNumber,
   generateCvv,
   generateAccountNumber,
   generateBankReference,
+  generateOtpCode,
 };

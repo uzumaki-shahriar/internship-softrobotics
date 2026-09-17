@@ -22,6 +22,13 @@ module.exports = {
   bankApiBaseUrl: process.env.BANK_API_BASE_URL || "http://localhost:8001",
   bankApiKey: required("BANK_API_KEY"),
 
+  // The Bank's OTP challenge page is customer-facing - the customer's
+  // browser is redirected there directly, so this must be an address that
+  // browser can actually reach. Deliberately separate from bankApiBaseUrl,
+  // which is only ever called server-to-server and may be an internal
+  // Docker hostname a browser could never resolve.
+  bankPublicBaseUrl: process.env.BANK_PUBLIC_BASE_URL || "http://localhost:8001",
+
   checkoutSessionTtlMinutes: parseInt(process.env.CHECKOUT_SESSION_TTL_MINUTES || "5", 10),
 
   // Card-testing-fraud guard: a real checkout (Stripe, SSLCommerz) locks a

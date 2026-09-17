@@ -9,6 +9,7 @@ const requestLogger = require("./middleware/requestLogger");
 const { errorHandler, notFoundHandler } = require("./middleware/errorHandler");
 const apiRouter = require("./routes/api");
 const adminRouter = require("./routes/admin");
+const otpRouter = require("./routes/otp");
 
 const app = express();
 
@@ -46,6 +47,11 @@ app.get("/health", (req, res) => res.json({ status: "ok", bank: config.bankName 
 
 app.use("/api", apiRouter);
 app.use("/admin", adminRouter);
+// Public, customer-facing OTP challenge page - deliberately NOT under /api
+// (that's apiKeyAuth-protected server-to-server surface, and a customer's
+// browser has no API key) and NOT under /admin (no session/login here -
+// see routes/otp.js for its actual trust model).
+app.use("/otp", otpRouter);
 app.get("/", (req, res) => res.redirect("/admin/dashboard"));
 
 app.use(notFoundHandler);

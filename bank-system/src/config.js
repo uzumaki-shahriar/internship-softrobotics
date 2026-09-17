@@ -18,4 +18,6 @@ module.exports = {
   apiKey: required("BANK_API_KEY"),
   sessionSecret: required("SESSION_SECRET"),
   logLevel: process.env.LOG_LEVEL || "info",
+  otpExpiryMinutes: parseInt(process.env.OTP_EXPIRY_MINUTES || "5", 10),
+  otpMaxAttempts: parseInt(process.env.OTP_MAX_ATTEMPTS || "3", 10),
 };

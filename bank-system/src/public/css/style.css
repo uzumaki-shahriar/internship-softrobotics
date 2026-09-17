@@ -155,3 +155,14 @@ button:hover { opacity: 0.9; }
   font-size: 12px;
   margin-top: 2px;
 }
+
+.btn-link-muted {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--muted);
+  text-decoration: underline;
+  font-size: 13px;
+  cursor: pointer;
+}
+.btn-link-muted:hover { color: var(--primary); }

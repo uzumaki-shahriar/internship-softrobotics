@@ -31,6 +31,7 @@ enum TransactionType {
 enum TransactionStatus {
   approved
   declined
+  pending
 }
 
 enum DeclineReason {
@@ -47,6 +48,15 @@ enum DeclineReason {
   ORIGINAL_NOT_APPROVED
   REFUND_EXCEEDS_CHARGE
   ACCOUNT_NOT_FOUND
+  OTP_FAILED
+  OTP_EXPIRED
+}
+
+enum OtpStatus {
+  pending
+  verified
+  failed
+  expired
 }
 
 model Admin {
@@ -96,9 +106,9 @@ model Card {
 }
 
 model BankTransaction {
-  id             Int      @id @default(autoincrement())
-  bankReference  String   @unique @map("bank_reference")
-  idempotencyKey String   @unique @map("idempotency_key")
+  id               Int    @id @default(autoincrement())
+  bankReference    String @unique @map("bank_reference")
+  idempotencyKey   String @unique @map("idempotency_key")
   gatewayReference String @map("gateway_reference")
 
   accountId Int?     @map("account_id")
@@ -106,18 +116,39 @@ model BankTransaction {
   cardId    Int?     @map("card_id")
   card      Card?    @relation(fields: [cardId], references: [id])
 
-  type         TransactionType
-  amount       Decimal            @db.Decimal(15, 2)
-  currency     String
-  balanceAfter Decimal?           @map("balance_after") @db.Decimal(15, 2)
-  status       TransactionStatus
+  type          TransactionType
+  amount        Decimal           @db.Decimal(15, 2)
+  currency      String
+  balanceAfter  Decimal?          @map("balance_after") @db.Decimal(15, 2)
+  status        TransactionStatus
   declineReason DeclineReason?    @map("decline_reason")
 
   relatedTransactionId Int?              @map("related_transaction_id")
   relatedTransaction   BankTransaction?  @relation("Reversal", fields: [relatedTransactionId], references: [id])
   reversals            BankTransaction[] @relation("Reversal")
 
+  otpChallenge OtpChallenge?
+
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("bank_transactions")
+}
+
+model OtpChallenge {
+  id            Int             @id @default(autoincrement())
+  transactionId Int             @unique @map("transaction_id")
+  transaction   BankTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  code         String
+  attemptCount Int       @default(0) @map("attempt_count")
+  status       OtpStatus @default(pending)
+  expiresAt    DateTime  @map("expires_at")
+  // Where to send the customer's browser back once this challenge resolves
+  // (approved or declined) - set from the Gateway's `return_url` on /charge.
+  returnUrl    String    @map("return_url")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("otp_challenges")
 }

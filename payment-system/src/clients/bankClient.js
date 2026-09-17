@@ -35,6 +35,27 @@ function refund(payload) {
   return callBank("/api/cards/refund", payload);
 }
 
+/**
+ * Confirms a charge's real outcome server-to-server when the customer's
+ * browser bounces back from the Bank's OTP page - never trusts that
+ * redirect alone. Same failure handling as callBank: unreachable/timeout
+ * becomes a clean GATEWAY_ERROR decline rather than a hang or crash.
+ */
+async function getChargeStatus(idempotencyKey) {
+  try {
+    const res = await fetch(`${config.bankApiBaseUrl}/api/cards/status/${encodeURIComponent(idempotencyKey)}`, {
+      headers: { "X-API-KEY": config.bankApiKey },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      return { status: "declined", decline_reason: "GATEWAY_ERROR" };
+    }
+    return res.json();
+  } catch {
+    return { status: "declined", decline_reason: "GATEWAY_ERROR" };
+  }
+}
+
 // Testing convenience only - lets the checkout page show one-click "fill
 // this card" buttons for whatever the Bank System currently has seeded,
 // instead of hardcoding numbers that change on every reseed. Never fails
@@ -53,4 +74,4 @@ async function getTestCards() {
   }
 }
 
-module.exports = { charge, refund, getTestCards };
+module.exports = { charge, refund, getChargeStatus, getTestCards };
