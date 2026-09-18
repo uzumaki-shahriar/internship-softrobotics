@@ -21,14 +21,10 @@ router.post("/transactions/:id/refund", transactionController.refund);
 router.get("/merchants", merchantController.list);
 router.get("/merchants/new", merchantController.showNewForm);
 router.post("/merchants", merchantController.create);
-router.get("/merchants/:id/edit", merchantController.showEditForm);
-router.post("/merchants/:id/edit", merchantController.update);
 router.get("/merchants/:id/dashboard", merchantController.dashboard);
 
-// Merchant wallet
-router.get("/merchants/:id/wallet", merchantController.showWallet);
-
-// Merchant settlement config
+// Merchant settlement config (also the merchant's edit page — name lives on
+// the same row as the settlement/rolling fields)
 router.get(
   "/merchants/:id/settlement-config",
   merchantController.showSettlementConfig

@@ -12,35 +12,30 @@ async function main() {
     data: { name: "Default POS" },
   });
 
-  const merchantOne = await prisma.merchant.create({
-    data: { name: "ABC Store" },
-  });
-
-  const merchantTwo = await prisma.merchant.create({
-    data: { name: "XYZ Traders" },
-  });
-
   // 10% of every completed transaction is held back as a rolling reserve and
-  // released a month later; the rest becomes available at the next daily
-  // settlement cycle. lastSettledAt is set to "now" so the first real
-  // settlement waits a full cycle instead of firing on the very next cron
-  // tick (a never-settled config is treated as immediately due).
+  // released a month later; the rest (settledAmount) becomes available at
+  // the merchant's next daily settlement cycle.
   const now = new Date();
-  const rollingPercentage = 10;
   const twoMonthsAgo = new Date(now);
   twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
   const oneMonthAgo = new Date(now);
   oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+  const dayAfterTwoMonthsAgo = new Date(twoMonthsAgo);
+  dayAfterTwoMonthsAgo.setDate(dayAfterTwoMonthsAgo.getDate() + 1);
 
-  await prisma.merchantSettlementConfig.create({
+  const merchantOne = await prisma.merchant.create({
     data: {
-      merchantId: merchantOne.id,
+      name: "ABC Store",
       settlementCycle: "Daily",
-      settlementTime: "02:00",
-      rollingPercentage,
+      rollingPercentage: 10,
       rollingPeriod: "Monthly",
-      lastSettledAt: now,
     },
+  });
+
+  // No custom settlement/rolling config — keeps the schema defaults
+  // (Daily cycle, 0% rolling), shown as the "just onboarded" state.
+  const merchantTwo = await prisma.merchant.create({
+    data: { name: "XYZ Traders" },
   });
 
   // Historical transactions below completed 2 months ago and their rolling
@@ -64,6 +59,9 @@ async function main() {
       rollingAmount: 98,
       rollingReleaseAt: oneMonthAgo,
       rollingReleasedAt: oneMonthAgo,
+      settledAmount: 882,
+      settlementDate: dayAfterTwoMonthsAgo,
+      settledAt: dayAfterTwoMonthsAgo,
     },
   });
 
@@ -84,6 +82,9 @@ async function main() {
       rollingAmount: 49,
       rollingReleaseAt: oneMonthAgo,
       rollingReleasedAt: oneMonthAgo,
+      settledAmount: 441,
+      settlementDate: dayAfterTwoMonthsAgo,
+      settledAt: dayAfterTwoMonthsAgo,
       refunds: {
         create: {
           amount: 200,
@@ -111,6 +112,9 @@ async function main() {
       rollingAmount: 29.4,
       rollingReleaseAt: oneMonthAgo,
       rollingReleasedAt: oneMonthAgo,
+      settledAmount: 264.6,
+      settlementDate: dayAfterTwoMonthsAgo,
+      settledAt: dayAfterTwoMonthsAgo,
       refunds: {
         create: {
           amount: 300,
@@ -152,7 +156,7 @@ async function main() {
     },
   });
 
-  // Merchant 2 has no transactions yet — empty wallet, no settlement config
+  // Merchant 2 has no transactions yet — empty wallet, default settings
   await prisma.wallet.create({
     data: {
       merchantId: merchantTwo.id,

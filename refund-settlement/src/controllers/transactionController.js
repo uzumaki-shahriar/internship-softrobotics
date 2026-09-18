@@ -1,4 +1,11 @@
 const prisma = require("../lib/prisma");
+const { computeCompletionFields } = require("../lib/walletSplit");
+
+function generateReference(prefix) {
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const random = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `${prefix}-${timestamp}${random}`;
+}
 
 // GET /transactions
 async function list(req, res) {
@@ -26,26 +33,63 @@ async function showNewForm(req, res) {
 }
 
 // POST /transactions
+// Transactions complete immediately — no Pending/cron step. The rolling and
+// settlement split happens right here, the same math the settlement/rolling
+// release jobs later check against.
 async function create(req, res) {
-  const { merchant_id, order_id, invoice_id, amount, currency_id, pos_id } =
-    req.body;
+  const { merchant_id, amount, currency_id, pos_id } = req.body;
+
+  const merchantId = Number(merchant_id);
+  const currencyId = Number(currency_id);
+
+  const merchant = await prisma.merchant.findUnique({
+    where: { id: merchantId },
+  });
+
+  if (!merchant) return res.status(404).send("Merchant not found");
 
   const gross = Number(amount);
   const fee = Number((gross * 0.02).toFixed(2)); // simple flat 2% fee for demo
   const net = Number((gross - fee).toFixed(2));
+  const now = new Date();
 
-  await prisma.transaction.create({
-    data: {
-      merchantId: Number(merchant_id),
-      orderId: order_id,
-      invoiceId: invoice_id,
-      currencyId: Number(currency_id),
-      posId: Number(pos_id),
-      gross,
-      fee,
-      net,
-      transactionState: "Pending",
-    },
+  const { rollingAmount, settledAmount, rollingReleaseAt, settlementDate } =
+    computeCompletionFields(net, merchant, now);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.transaction.create({
+      data: {
+        merchantId,
+        orderId: generateReference("ORDER"),
+        invoiceId: generateReference("INV"),
+        currencyId,
+        posId: Number(pos_id),
+        gross,
+        fee,
+        net,
+        transactionState: "Completed",
+        completedAt: now,
+        rollingAmount,
+        rollingReleaseAt,
+        settledAmount,
+        settlementDate,
+      },
+    });
+
+    const wallet = await tx.wallet.findUnique({
+      where: { merchantId_currencyId: { merchantId, currencyId } },
+    });
+
+    if (wallet) {
+      await tx.wallet.update({
+        where: { id: wallet.id },
+        data: {
+          totalBalance: { increment: net },
+          blockedBalance: { increment: settledAmount },
+          rollingBalance: { increment: rollingAmount },
+        },
+      });
+    }
   });
 
   res.redirect("/transactions");

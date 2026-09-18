@@ -1,45 +1,67 @@
 const prisma = require("../lib/prisma");
-const { isSettlementDue } = require("../lib/dateMath");
 
-// At each merchant's configured settlement cycle, the entire blocked balance
-// (the non-rolling portion of completed transactions) becomes available.
-// The rolling portion is untouched here — it is released separately once its
-// own rolling period elapses (see processRollingReleases).
+// Settles each transaction's blocked (non-rolling) amount back into the
+// wallet once its own settlement_date has passed — mirrors how
+// processRollingReleases works, just for the settled_amount/settlement_date/
+// settled_at trio instead of rolling_amount/rolling_release_at/
+// rolling_released_at. Each settled transaction also gets its own row in
+// the settlements ledger.
 async function processSettlements() {
-  const configs = await prisma.merchantSettlementConfig.findMany();
   const now = new Date();
 
-  let settledMerchants = 0;
+  const due = await prisma.transaction.findMany({
+    where: {
+      settledAmount: { gt: 0 },
+      settledAt: null,
+      settlementDate: { lte: now },
+    },
+  });
 
-  for (const config of configs) {
-    if (!isSettlementDue(config, now)) continue;
+  let settled = 0;
 
-    const wallets = await prisma.wallet.findMany({
-      where: { merchantId: config.merchantId },
-    });
+  for (const transaction of due) {
+    const amount = Number(transaction.settledAmount);
 
-    for (const wallet of wallets) {
-      const eligible = Number(wallet.blockedBalance);
-      if (eligible <= 0) continue;
-
-      await prisma.wallet.update({
-        where: { id: wallet.id },
-        data: {
-          blockedBalance: { decrement: eligible },
-          availableBalance: { increment: eligible },
+    await prisma.$transaction(async (tx) => {
+      const wallet = await tx.wallet.findUnique({
+        where: {
+          merchantId_currencyId: {
+            merchantId: transaction.merchantId,
+            currencyId: transaction.currencyId,
+          },
         },
       });
-    }
 
-    await prisma.merchantSettlementConfig.update({
-      where: { id: config.id },
-      data: { lastSettledAt: now },
+      if (!wallet) return;
+
+      await tx.wallet.update({
+        where: { id: wallet.id },
+        data: {
+          blockedBalance: { decrement: amount },
+          availableBalance: { increment: amount },
+        },
+      });
+
+      await tx.transaction.update({
+        where: { id: transaction.id },
+        data: { settledAt: now },
+      });
+
+      await tx.settlement.create({
+        data: {
+          merchantId: transaction.merchantId,
+          walletId: wallet.id,
+          amount,
+          status: "Completed",
+          completedAt: now,
+        },
+      });
     });
 
-    settledMerchants += 1;
+    settled += 1;
   }
 
-  return settledMerchants;
+  return settled;
 }
 
 module.exports = processSettlements;

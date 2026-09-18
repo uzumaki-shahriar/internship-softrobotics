@@ -44,10 +44,16 @@ model Merchant {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  wallets           Wallet[]
-  transactions      Transaction[]
-  settlements       Settlement[]
-  settlementConfig  MerchantSettlementConfig?
+  // Settlement/rolling configuration — one merchant has exactly one of
+  // these, so it lives directly on the merchant row rather than a separate
+  // 1:1 table.
+  settlementCycle   SettlementCycle @default(Daily) @map("settlement_cycle")
+  rollingPercentage Decimal         @default(0) @map("rolling_percentage") @db.Decimal(5, 2)
+  rollingPeriod     RollingPeriod   @default(Monthly) @map("rolling_period")
+
+  wallets      Wallet[]
+  transactions Transaction[]
+  settlements  Settlement[]
 
   @@map("merchants")
 }
@@ -102,12 +108,18 @@ model Transaction {
   fee             Decimal           @default(0) @db.Decimal(18, 2)
   net             Decimal           @db.Decimal(18, 2)
   refundedAmount  Decimal           @default(0) @map("refunded_amount") @db.Decimal(18, 2)
+  // Non-rolling portion of net (net - rollingAmount), frozen at completion.
+  // settlementDate is when it becomes eligible; settledAt is null while
+  // still blocked, and set once the settlement job actually moves it to
+  // available — mirrors the rollingAmount/rollingReleaseAt/rollingReleasedAt
+  // trio below.
   settledAmount   Decimal           @default(0) @map("settled_amount") @db.Decimal(18, 2)
+  settlementDate  DateTime?         @map("settlement_date")
+  settledAt       DateTime?         @map("settled_at")
   rollingAmount     Decimal   @default(0) @map("rolling_amount") @db.Decimal(18, 2)
   rollingReleaseAt  DateTime? @map("rolling_release_at")
   rollingReleasedAt DateTime? @map("rolling_released_at")
   transactionState TransactionState @default(Pending) @map("transaction_state")
-  settlementDate  DateTime?         @map("settlement_date")
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
   completedAt     DateTime?         @map("completed_at")
@@ -146,20 +158,4 @@ model Settlement {
   wallet   Wallet   @relation(fields: [walletId], references: [id])
 
   @@map("settlements")
-}
-
-model MerchantSettlementConfig {
-  id                Int             @id @default(autoincrement())
-  merchantId        Int             @unique @map("merchant_id")
-  settlementCycle   SettlementCycle @default(Daily) @map("settlement_cycle")
-  settlementTime    String          @map("settlement_time")
-  rollingPercentage Decimal         @default(0) @map("rolling_percentage") @db.Decimal(5, 2)
-  rollingPeriod     RollingPeriod   @default(Monthly) @map("rolling_period")
-  lastSettledAt     DateTime?       @map("last_settled_at")
-  createdAt         DateTime        @default(now()) @map("created_at")
-  updatedAt         DateTime        @updatedAt @map("updated_at")
-
-  merchant Merchant @relation(fields: [merchantId], references: [id])
-
-  @@map("merchant_settlement_configs")
 }

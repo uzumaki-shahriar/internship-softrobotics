@@ -17,10 +17,6 @@
       <div class="stat-value"><%= w.availableBalance %></div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Blocked (<%= w.currency.code %>)</div>
-      <div class="stat-value"><%= w.blockedBalance %></div>
-    </div>
-    <div class="stat-card">
       <div class="stat-label">Rolling (<%= w.currency.code %>)</div>
       <div class="stat-value"><%= w.rollingBalance %></div>
     </div>
@@ -29,21 +25,15 @@
 
 <div class="actions-row">
   <a href="/transactions/new?merchant_id=<%= merchant.id %>" class="btn">New Transaction</a>
-  <a href="/merchants/<%= merchant.id %>/wallet" class="btn">View Wallet</a>
-  <a href="/merchants/<%= merchant.id %>/settlement-config" class="btn">Settlement Config</a>
+  <a href="/merchants/<%= merchant.id %>/settlement-config" class="btn">Edit Merchant</a>
 </div>
 
 <h2>Settlement Configuration</h2>
-<% if (config) { %>
-  <table class="details">
-    <tr><td>Cycle</td><td><%= config.settlementCycle %></td></tr>
-    <tr><td>Time</td><td><%= config.settlementTime %></td></tr>
-    <tr><td>Rolling Percentage</td><td><%= config.rollingPercentage %>%</td></tr>
-    <tr><td>Rolling Period</td><td><%= config.rollingPeriod %></td></tr>
-  </table>
-<% } else { %>
-  <p>No settlement configuration yet. <a href="/merchants/<%= merchant.id %>/settlement-config">Set it up</a>.</p>
-<% } %>
+<table class="details">
+  <tr><td>Cycle</td><td><%= merchant.settlementCycle %></td></tr>
+  <tr><td>Rolling Percentage</td><td><%= merchant.rollingPercentage %>%</td></tr>
+  <tr><td>Rolling Period</td><td><%= merchant.rollingPeriod %></td></tr>
+</table>
 
 <h2>Recent Transactions</h2>
 <table>

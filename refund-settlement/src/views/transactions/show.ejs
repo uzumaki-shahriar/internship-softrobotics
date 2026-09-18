@@ -11,6 +11,19 @@
   <tr><td>Refunded</td><td><%= transaction.refundedAmount %></td></tr>
   <tr><td>Refundable</td><td><%= Number(transaction.gross) - Number(transaction.refundedAmount) %></td></tr>
   <tr><td>Status</td><td><%= transaction.transactionState %></td></tr>
+  <% if (Number(transaction.settledAmount) > 0) { %>
+    <tr><td>Settlement Amount</td><td><%= transaction.settledAmount %></td></tr>
+    <tr>
+      <td>Settlement Status</td>
+      <td>
+        <% if (transaction.settledAt) { %>
+          Settled on <%= transaction.settledAt.toDateString() %>
+        <% } else { %>
+          Blocked until <%= transaction.settlementDate.toDateString() %>
+        <% } %>
+      </td>
+    </tr>
+  <% } %>
   <% if (Number(transaction.rollingAmount) > 0) { %>
     <tr><td>Rolling Reserve</td><td><%= transaction.rollingAmount %></td></tr>
     <tr>

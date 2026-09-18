@@ -34,30 +34,6 @@ async function create(req, res) {
   res.redirect("/merchants");
 }
 
-// GET /merchants/:id/edit
-async function showEditForm(req, res) {
-  const merchant = await prisma.merchant.findUnique({
-    where: { id: Number(req.params.id) },
-  });
-
-  if (!merchant) return res.status(404).send("Merchant not found");
-
-  res.render("merchants/edit", { merchant });
-}
-
-// POST /merchants/:id/edit
-async function update(req, res) {
-  const merchantId = Number(req.params.id);
-  const { name } = req.body;
-
-  await prisma.merchant.update({
-    where: { id: merchantId },
-    data: { name },
-  });
-
-  res.redirect("/merchants");
-}
-
 // GET /merchants/:id/dashboard
 async function dashboard(req, res) {
   const merchantId = Number(req.params.id);
@@ -84,32 +60,12 @@ async function dashboard(req, res) {
     where: { merchantId },
   });
 
-  const config = await prisma.merchantSettlementConfig.findUnique({
-    where: { merchantId },
-  });
-
   res.render("merchants/dashboard", {
     merchant,
     wallets,
     recentTransactions,
     transactionCount,
-    config,
   });
-}
-
-// GET /merchants/:id/wallet
-async function showWallet(req, res) {
-  const merchantId = Number(req.params.id);
-
-  const merchant = await prisma.merchant.findUnique({
-    where: { id: merchantId },
-  });
-  const wallets = await prisma.wallet.findMany({
-    where: { merchantId },
-    include: { currency: true },
-  });
-
-  res.render("wallet", { merchant, wallets });
 }
 
 // GET /merchants/:id/settlement-config
@@ -119,45 +75,30 @@ async function showSettlementConfig(req, res) {
   const merchant = await prisma.merchant.findUnique({
     where: { id: merchantId },
   });
-  const config = await prisma.merchantSettlementConfig.findUnique({
-    where: { merchantId },
-  });
+
+  if (!merchant) return res.status(404).send("Merchant not found");
+
   const settlements = await prisma.settlement.findMany({
     where: { merchantId },
     orderBy: { id: "desc" },
   });
 
-  res.render("settlement-config", { merchant, config, settlements });
+  res.render("settlement-config", { merchant, settlements });
 }
 
 // POST /merchants/:id/settlement-config
 async function updateSettlementConfig(req, res) {
   const merchantId = Number(req.params.id);
-  const {
-    settlement_cycle,
-    settlement_time,
-    rolling_percentage,
-    rolling_period,
-  } = req.body;
+  const { name, settlement_cycle, rolling_percentage, rolling_period } =
+    req.body;
 
-  await prisma.merchantSettlementConfig.upsert({
-    where: { merchantId },
-    update: {
+  await prisma.merchant.update({
+    where: { id: merchantId },
+    data: {
+      name,
       settlementCycle: settlement_cycle,
-      settlementTime: settlement_time,
       rollingPercentage: Number(rolling_percentage),
       rollingPeriod: rolling_period,
-    },
-    create: {
-      merchantId,
-      settlementCycle: settlement_cycle,
-      settlementTime: settlement_time,
-      rollingPercentage: Number(rolling_percentage),
-      rollingPeriod: rolling_period,
-      // Baseline so the first real settlement waits a full cycle instead of
-      // firing on the very next cron tick (isSettlementDue treats "never
-      // settled" as immediately due).
-      lastSettledAt: new Date(),
     },
   });
 
@@ -165,6 +106,10 @@ async function updateSettlementConfig(req, res) {
 }
 
 // POST /merchants/:id/settlements
+// Direct payout request: submitting immediately debits the wallet and marks
+// the settlement Completed — no pending/approval step (real bank payout is
+// out of scope for this demo; this just represents the money leaving the
+// platform).
 async function createSettlement(req, res) {
   const merchantId = Number(req.params.id);
   const amount = Number(req.body.amount);
@@ -177,14 +122,24 @@ async function createSettlement(req, res) {
     return res.status(400).send("Invalid settlement amount");
   }
 
-  await prisma.settlement.create({
-    data: {
-      merchantId,
-      walletId: wallet.id,
-      amount,
-      status: "Pending",
-    },
-  });
+  await prisma.$transaction([
+    prisma.wallet.update({
+      where: { id: wallet.id },
+      data: {
+        availableBalance: { decrement: amount },
+        totalBalance: { decrement: amount },
+      },
+    }),
+    prisma.settlement.create({
+      data: {
+        merchantId,
+        walletId: wallet.id,
+        amount,
+        status: "Completed",
+        completedAt: new Date(),
+      },
+    }),
+  ]);
 
   res.redirect(`/merchants/${merchantId}/settlement-config`);
 }
@@ -193,10 +148,7 @@ module.exports = {
   list,
   showNewForm,
   create,
-  showEditForm,
-  update,
   dashboard,
-  showWallet,
   showSettlementConfig,
   updateSettlementConfig,
   createSettlement,

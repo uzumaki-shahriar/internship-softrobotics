@@ -59,7 +59,7 @@ Can:
 * View transaction details
 * Refund transaction
 * View wallet
-* Create settlement request
+* Withdraw funds (settlement)
 * View settlements
 
 For demo, authentication can be skipped.
@@ -324,9 +324,6 @@ Settlement Cycle
 ( ) Weekly
 ( ) Monthly
 
-Settlement Time
-[ 02:00 ]
-
 Rolling Percentage
 [ 10 ] %
 
@@ -342,10 +339,12 @@ Configuration fields:
 
 ```text
 settlement_cycle
-settlement_time
 rolling_percentage
 rolling_period
 ```
+
+These live directly on the `merchants` row (one merchant has exactly one
+settlement/rolling configuration, so there's no separate config table).
 
 ## Settlement Cycle
 
@@ -356,6 +355,11 @@ Daily
 Weekly
 Monthly
 ```
+
+Settlement runs on calendar date, not time-of-day: whichever day completes
+the cycle (next day for Daily, +7 days for Weekly, +1 month for Monthly)
+is when a merchant's blocked balance becomes eligible — there is no
+configurable time-of-day.
 
 ## Rolling Percentage & Period
 
@@ -411,19 +415,20 @@ Then settlement can be requested.
 
 ---
 
-# 11. Settlement
+# 11. Settlement (Withdrawal)
 
-Merchant can request settlement.
+Merchant can withdraw from their available balance. Like refunds, this is
+direct — no Pending/approval step, no cron.
 
 Frontend:
 
 ```text
 Available Balance: ৳1470
 
-Settlement Amount
+Withdrawal Amount
 [ 1000.00 ]
 
-[ Request Settlement ]
+[ Withdraw ]
 ```
 
 API:
@@ -440,21 +445,10 @@ Body:
 }
 ```
 
-New settlement:
+Immediately on submission:
 
 ```text
-Status = Pending
-```
-
-Cron:
-
-```text
-Pending → Completed
-```
-
-On completion:
-
-```text
+Status = Completed
 available_balance -= amount
 total_balance -= amount
 ```
@@ -499,6 +493,31 @@ refunds
 
 Modify/add:
 
+## merchants
+
+Settlement/rolling configuration lives directly on the merchant row — one
+merchant has exactly one configuration, so there's no separate config table:
+
+```text
+id
+name
+settlement_cycle
+rolling_percentage
+rolling_period
+created_at
+updated_at
+```
+
+Example:
+
+```text
+id                  1
+name                ABC Store
+settlement_cycle    Daily
+rolling_percentage  10
+rolling_period      Monthly
+```
+
 ## wallets
 
 ```text
@@ -539,19 +558,30 @@ gross
 fee
 net
 refunded_amount
+
 settled_amount
+settlement_date
+settled_at
 
 rolling_amount
 rolling_release_at
 rolling_released_at
 
 transaction_state
-settlement_date
 
 created_at
 updated_at
 completed_at
 ```
+
+`settled_amount` is the non-rolling portion of `net` (`net - rolling_amount`),
+frozen the moment the transaction completes. `settlement_date` is when it
+becomes eligible (the next settlement-cycle boundary from completion);
+`settled_at` is null while still blocked and set once the settlement job
+actually moves it to available — the same three-field pattern as
+`rolling_amount` / `rolling_release_at` / `rolling_released_at`, just for
+settlement instead of rolling. Each is tracked per transaction, not as a
+single wallet-level lump sum.
 
 States:
 
@@ -603,34 +633,6 @@ Failed
 
 ---
 
-## merchant settlement config
-
-Add simple table:
-
-```text
-merchant_settlement_configs
-
-id
-merchant_id
-settlement_cycle
-settlement_time
-rolling_percentage
-rolling_period
-last_settled_at
-created_at
-updated_at
-```
-
-Example:
-
-```text
-merchant_id         1
-settlement_cycle    Daily
-settlement_time     02:00
-rolling_percentage  10
-rolling_period      Monthly
-```
-
 ---
 
 # 13. API
@@ -676,21 +678,25 @@ Find Pending payments
         ↓
 Mark Completed
         ↓
-Split net into rolling_amount / blocked_amount
+Split net into rolling_amount / settled_amount
         ↓
 Update wallet (total, blocked, rolling)
         ↓
 Set rolling_release_at = now + rolling_period
+Set settlement_date = next settlement-cycle boundary from now
 ```
 
 ## Settlement job
 
 ```text
-For each merchant config, if cycle is due
+Find transactions where settlement_date <= now
+and settled_at is null
         ↓
-Move entire blocked_balance → available_balance
+Move settled_amount: blocked_balance → available_balance
         ↓
-Set last_settled_at = now
+Set settled_at = now
+        ↓
+Create a settlements ledger row
 ```
 
 ## Rolling release job
@@ -703,6 +709,10 @@ Move rolling_amount → available_balance
         ↓
 Set rolling_released_at = now
 ```
+
+Settlement and rolling release are both per-transaction and run
+independently of each other — a transaction's blocked amount and its
+rolling reserve can (and usually do) clear on completely different dates.
 
 ---
 
@@ -717,11 +727,11 @@ blocked += (net - rolling_amount)
 rolling += rolling_amount
 ```
 
-## Settlement eligibility (cycle tick)
+## Settlement eligibility (per transaction, when its settlement_date elapses)
 
 ```text
-available += blocked
-blocked = 0
+available += transaction.settled_amount
+blocked -= transaction.settled_amount
 ```
 
 ## Rolling release (per transaction, when its rolling_period elapses)
