@@ -9,7 +9,7 @@ const banksRouter = require("./banks");
 
 const router = express.Router();
 
-router.use("/", authRouter); // login/logout - no session required
+router.use("/", authRouter); // logout - no session required (login is at /login)
 
 router.use(requireAdminSession);
 router.use("/", dashboardRouter);

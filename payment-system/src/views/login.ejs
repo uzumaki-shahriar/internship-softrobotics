@@ -1,8 +1,8 @@
 <div class="auth-box">
   <h1><%= appName %></h1>
-  <p class="muted">Admin sign in</p>
+  <p class="muted">Sign in</p>
   <% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
-  <form method="post" action="/admin/login" id="login-form" novalidate>
+  <form method="post" action="/login" id="login-form" novalidate>
     <label>Email
       <input type="email" name="email" required autofocus />
     </label>
@@ -11,5 +11,8 @@
     </label>
     <button type="submit">Sign in</button>
   </form>
+  <p class="muted" style="margin-top:16px">
+    No merchant account yet? <a href="/dashboard/register">Create a merchant account</a>.
+  </p>
 </div>
 <script src="/js/validation.js"></script>

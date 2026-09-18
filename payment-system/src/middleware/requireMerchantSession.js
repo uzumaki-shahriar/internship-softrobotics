@@ -1,6 +1,6 @@
 function requireMerchantSession(req, res, next) {
   if (!req.session.merchantId) {
-    return res.redirect("/dashboard/login");
+    return res.redirect("/login");
   }
   next();
 }

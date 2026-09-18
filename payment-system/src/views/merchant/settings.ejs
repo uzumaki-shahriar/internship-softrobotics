@@ -10,6 +10,40 @@
   </tbody>
 </table>
 
+<h2>Bank account</h2>
+<% if (bankAccountError) { %>
+  <div class="flash flash-error"><%= bankAccountError %></div>
+<% } %>
+<p class="muted">
+  Settlement and rolling-release payouts are sent here.
+  Currently: <%= merchant.bankAccountNumber || "not linked" %>
+</p>
+<form method="post" action="/dashboard/settings/bank-account">
+  <label>Account number
+    <input type="text" name="account_number" value="<%= merchant.bankAccountNumber || "" %>" required />
+  </label>
+  <button type="submit">Save bank account</button>
+</form>
+
+<h2>Wallet</h2>
+<% if (merchant.wallets.length === 0) { %>
+  <p class="muted">No wallet yet.</p>
+<% } else { %>
+  <table>
+    <thead><tr><th>Currency</th><th>Available</th><th>Blocked</th><th>Rolling</th></tr></thead>
+    <tbody>
+      <% merchant.wallets.forEach(function(w) { %>
+        <tr>
+          <td><%= w.currency.code %></td>
+          <td><%= w.balance %></td>
+          <td><%= w.blockedAmount %></td>
+          <td><%= w.rollingAmount %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+<% } %>
+
 <h2>API key</h2>
 <% if (newApiKey) { %>
   <div class="flash flash-success">
@@ -28,7 +62,7 @@
   <p class="muted">No pricing plan set yet - an admin sets this when approving your account.</p>
 <% } else { %>
   <table>
-    <thead><tr><th>Currency</th><th>Commission %</th><th>Fixed fee</th><th>Settlement (days)</th></tr></thead>
+    <thead><tr><th>Currency</th><th>Commission %</th><th>Fixed fee</th><th>Settlement (days)</th><th>Rolling %</th><th>Rolling period</th></tr></thead>
     <tbody>
       <% merchant.pricingPlans.forEach(function(p) { %>
         <tr>
@@ -36,6 +70,8 @@
           <td><%= p.commissionPercentage %>%</td>
           <td><%= p.commissionFixed %></td>
           <td><%= p.settlementDay %></td>
+          <td><%= p.rollingPercentage %>%</td>
+          <td><%= p.rollingPeriod %></td>
         </tr>
       <% }) %>
     </tbody>

@@ -20,7 +20,8 @@ router.get("/dashboard", async (req, res, next) => {
     const balanceByCurrency = {};
     for (const w of wallets) {
       const code = w.currency.code;
-      balanceByCurrency[code] = (balanceByCurrency[code] || 0) + Number(w.balance);
+      const held = Number(w.balance) + Number(w.blockedAmount) + Number(w.rollingAmount);
+      balanceByCurrency[code] = (balanceByCurrency[code] || 0) + held;
     }
 
     res.render("dashboard", {

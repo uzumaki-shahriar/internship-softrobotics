@@ -31,13 +31,19 @@ function sessionMiddleware(cookieName) {
   });
 }
 
-// Admin and merchant logins get their own session cookie, scoped to their
-// own path - real separate identities (like Stripe's dashboard vs internal
-// admin tooling being entirely different apps), so a browser can be logged
-// into both an admin account and a merchant account at once without one
-// login overwriting the other's session.
-app.use("/admin", sessionMiddleware("admin.sid"), flash());
-app.use("/dashboard", sessionMiddleware("merchant.sid"), flash());
+// Admin and merchant logins get their own session cookie - real separate
+// identities (like Stripe's dashboard vs internal admin tooling being
+// entirely different apps), so a browser can be logged into both an admin
+// account and a merchant account at once without one login overwriting the
+// other's session. They share one login page/form (routes/auth.js), which
+// picks the right one of these by the authenticated user's role.
+const adminSession = sessionMiddleware("admin.sid");
+const merchantSession = sessionMiddleware("merchant.sid");
+const adminFlash = flash();
+const merchantFlash = flash();
+
+app.use("/admin", adminSession, adminFlash);
+app.use("/dashboard", merchantSession, merchantFlash);
 
 app.use((req, res, next) => {
   res.locals.appName = config.appName;
@@ -51,6 +57,8 @@ app.use((req, res, next) => {
 app.get("/health", (req, res) => res.json({ status: "ok", service: config.appName }));
 app.get("/", (req, res) => res.render("home", { status: "ok" }));
 app.use("/docs", require("./routes/docs"));
+
+app.use(require("./routes/auth")({ adminSession, merchantSession, adminFlash, merchantFlash }));
 
 app.use("/api", require("./routes/api"));
 app.use("/checkout", require("./routes/checkout"));

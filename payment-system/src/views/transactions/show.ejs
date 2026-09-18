@@ -5,6 +5,7 @@ const refundable = ["completed", "partial_refunded"].includes(transaction.status
 <h1><%= transaction.invoiceId %></h1>
 <p class="muted">
   Order <%= transaction.orderId %> ·
+  <a href="/admin/merchants/<%= transaction.merchant.id %>"><%= transaction.merchant.storeId %></a> ·
   <span class="badge badge-<%= transaction.status %>"><%= transaction.status %></span>
 </p>
 
@@ -67,7 +68,7 @@ const refundable = ["completed", "partial_refunded"].includes(transaction.status
   <h2>Issue a refund</h2>
   <% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
   <p class="muted">Remaining refundable: <%= remaining.toFixed(2) %> <%= transaction.currency.code %></p>
-  <form method="post" action="/dashboard/transactions/<%= transaction.invoiceId %>/refund" class="confirm-form" data-confirm="Refund this transaction?" novalidate>
+  <form method="post" action="/admin/transactions/<%= transaction.invoiceId %>/refund" class="confirm-form" data-confirm="Refund this transaction?" novalidate>
     <label>Amount
       <input type="number" name="amount" step="0.01" min="0.01" max="<%= remaining %>"
              value="<%= values.amount || remaining.toFixed(2) %>" required />

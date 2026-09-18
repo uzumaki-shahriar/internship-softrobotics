@@ -21,10 +21,24 @@
       <div class="stat-label">No wallet yet</div>
     </div>
   <% } else { %>
-    <% wallets.forEach(function(w) { %>
+    <% wallets.forEach(function(w) {
+         const total = (Number(w.balance) + Number(w.blockedAmount) + Number(w.rollingAmount)).toFixed(2);
+    %>
+      <div class="stat-card">
+        <div class="stat-value"><%= w.currency.code %> <%= total %></div>
+        <div class="stat-label">Total balance</div>
+      </div>
       <div class="stat-card">
         <div class="stat-value"><%= w.currency.code %> <%= w.balance %></div>
-        <div class="stat-label">Wallet balance</div>
+        <div class="stat-label">Available</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value"><%= w.currency.code %> <%= w.blockedAmount %></div>
+        <div class="stat-label">Blocked (pending settlement)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value"><%= w.currency.code %> <%= w.rollingAmount %></div>
+        <div class="stat-label">Rolling reserve</div>
       </div>
     <% }) %>
   <% } %>

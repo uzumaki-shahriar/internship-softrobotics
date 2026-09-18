@@ -18,7 +18,7 @@
     <% transactions.forEach(function(t) { %>
       <tr>
         <td><%= t.createdAt.toISOString() %></td>
-        <td><%= t.invoiceId %></td>
+        <td><a href="/admin/transactions/<%= t.invoiceId %>"><%= t.invoiceId %></a></td>
         <td><a href="/admin/merchants/<%= t.merchant.id %>"><%= t.merchant.storeId %></a></td>
         <td><span class="badge badge-<%= t.status %>"><%= t.status %></span></td>
         <td><%= t.grossAmount %> <%= t.currency.code %></td>

@@ -211,4 +211,5 @@ module.exports = {
   listMerchants,
   approveMerchant,
   setMerchantStatus,
+  setBankAccount,
 };
