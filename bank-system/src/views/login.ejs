@@ -11,5 +11,20 @@
     </label>
     <button type="submit">Sign in</button>
   </form>
+
+  <div class="demo-accounts">
+    <h2>Demo account</h2>
+    <div class="demo-account-list">
+      <form method="post" action="/admin/login">
+        <input type="hidden" name="email" value="admin@bank.local" />
+        <input type="hidden" name="password" value="admin123" />
+        <button type="submit" class="demo-account-btn">
+          <span class="demo-account-icon">🏦</span>
+          <span class="demo-account-label">Admin</span>
+          <span class="demo-account-role muted">Bank admin panel</span>
+        </button>
+      </form>
+    </div>
+  </div>
 </div>
 <script src="/js/validation.js"></script>

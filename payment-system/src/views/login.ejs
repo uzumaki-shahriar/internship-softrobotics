@@ -14,5 +14,29 @@
   <p class="muted" style="margin-top:16px">
     No merchant account yet? <a href="/dashboard/register">Create a merchant account</a>.
   </p>
+
+  <div class="demo-accounts">
+    <h2>Demo accounts</h2>
+    <div class="demo-account-list">
+      <form method="post" action="/login">
+        <input type="hidden" name="email" value="admin@gateway.local" />
+        <input type="hidden" name="password" value="admin123" />
+        <button type="submit" class="demo-account-btn">
+          <span class="demo-account-icon">🛡️</span>
+          <span class="demo-account-label">Admin</span>
+          <span class="demo-account-role muted">Platform admin</span>
+        </button>
+      </form>
+      <form method="post" action="/login">
+        <input type="hidden" name="email" value="merchantb@example.com" />
+        <input type="hidden" name="password" value="password123" />
+        <button type="submit" class="demo-account-btn">
+          <span class="demo-account-icon">🏬</span>
+          <span class="demo-account-label">Merchant B</span>
+          <span class="demo-account-role muted">Merchant dashboard</span>
+        </button>
+      </form>
+    </div>
+  </div>
 </div>
 <script src="/js/validation.js"></script>
