@@ -52,6 +52,8 @@
       <th>ID</th>
       <th>Merchant</th>
       <th>Order</th>
+      <th>Gross</th>
+      <th>Fee</th>
       <th>Net</th>
       <th>Status</th>
     </tr>
@@ -62,6 +64,8 @@
         <td><%= t.id %></td>
         <td><%= t.merchant.name %></td>
         <td><%= t.orderId %></td>
+        <td><%= t.gross %></td>
+        <td><%= t.fee %></td>
         <td><%= t.net %></td>
         <td><%= t.transactionState %></td>
       </tr>

@@ -9,8 +9,6 @@ Main flow:
 ```text
 Create Transaction
         ↓
-     Pending
-        ↓ cron
     Completed
         ↓
  Merchant Wallet
@@ -95,7 +93,7 @@ Transactions
 
 ID       Order       Amount    Fee    Net    Status
 1001     ORD-1001   ৳1000     ৳20    ৳980   Completed
-1002     ORD-1002   ৳500      ৳10    ৳490   Pending
+1002     ORD-1002   ৳500      ৳10    ৳490   Completed
 ```
 
 Click row → transaction details.
@@ -108,8 +106,6 @@ Form:
 
 ```text
 Merchant
-Order ID
-Invoice ID
 Amount
 Currency
 POS
@@ -117,29 +113,24 @@ POS
 [Create Transaction]
 ```
 
+`order_id`/`invoice_id` are generated server-side, not entered by hand.
+
 Example:
 
 ```json
 {
   "merchant_id": 1,
-  "order_id": "ORDER-1001",
-  "invoice_id": "INV-1001",
   "amount": "1000.00",
   "currency_id": 4,
   "pos_id": 1
 }
 ```
 
-On creation:
+On creation, the transaction completes immediately — no Pending/cron step:
 
 ```text
-Transaction State = Pending
-```
-
-Cron later changes it:
-
-```text
-Pending → Completed
+Transaction State = Completed
+Split net into rolling_amount / settled_amount (see §16)
 ```
 
 ---
@@ -664,27 +655,14 @@ GET /api/merchants/:id/settlements
 Run every minute for demo.
 
 ```text
-process-payments
 process-settlements
 process-rolling-releases
 ```
 
-Refunds are not a cron job — they apply immediately when requested (see §6).
-
-## Payment job
-
-```text
-Find Pending payments
-        ↓
-Mark Completed
-        ↓
-Split net into rolling_amount / settled_amount
-        ↓
-Update wallet (total, blocked, rolling)
-        ↓
-Set rolling_release_at = now + rolling_period
-Set settlement_date = next settlement-cycle boundary from now
-```
+Transactions and refunds are not cron jobs — they complete/apply immediately
+(see §4, §6). On creation, a transaction's net is split into rolling_amount
+and settled_amount right away, with rolling_release_at and settlement_date
+set from the merchant's configuration.
 
 ## Settlement job
 
@@ -993,19 +971,16 @@ User should be able to do:
 
 ```text
 1. Open transaction list
-2. Create new transaction
-3. See Pending
-4. Cron → Completed
-5. Open transaction details
-6. Enter refund amount
-7. Refund
-8. See Partial Refunded / Refunded
-9. Open merchant wallet
-10. See Total / Available / Blocked
-11. PSP configure settlement cycle/time/block/rolling
-12. Request settlement
-13. Cron → Settlement Completed
-14. See wallet balance reduced
+2. Create new transaction → Completed immediately
+3. Open transaction details
+4. Enter refund amount → applies immediately
+5. See Partial Refunded / Refunded
+6. Open merchant dashboard
+7. See Total / Available / Blocked / Rolling
+8. PSP configure settlement cycle / rolling percentage / rolling period
+9. Withdraw funds → applies immediately
+10. Cron (or npm run jobs:run) → settlement + rolling release, per transaction
+11. See wallet balance move from blocked/rolling to available
 ```
 
 Final system:
@@ -1021,21 +996,18 @@ Final system:
         New Transaction
               │
               ↓
-           Pending
-              │
-           Cron
-              ↓
-         Completed
+          Completed
               │
               ↓
        Merchant Wallet
         ┌─────┴─────┐
         ↓           ↓
-     Refund      Settlement
-        ↓           ↓
-      Cron         Cron
-        ↓           ↓
-     Wallet       Wallet
+     Refund     Blocked / Rolling
+   (immediate)       │
+        │          Cron
+        ↓        (per transaction)
+     Wallet          ↓
+                   Wallet
 ```
 
 **Target:** small, understandable PSP demo. No production complexity.

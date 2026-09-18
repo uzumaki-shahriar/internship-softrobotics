@@ -41,6 +41,8 @@
     <tr>
       <th>ID</th>
       <th>Order</th>
+      <th>Gross</th>
+      <th>Fee</th>
       <th>Net</th>
       <th>Status</th>
     </tr>
@@ -50,6 +52,8 @@
       <tr onclick="window.location='/transactions/<%= t.id %>'">
         <td><%= t.id %></td>
         <td><%= t.orderId %></td>
+        <td><%= t.gross %></td>
+        <td><%= t.fee %></td>
         <td><%= t.net %></td>
         <td><%= t.transactionState %></td>
       </tr>

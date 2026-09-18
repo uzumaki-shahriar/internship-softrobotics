@@ -1,4 +1,5 @@
 const { PrismaClient } = require("@prisma/client");
+const { addRollingPeriod, addSettlementCycle } = require("../src/lib/dateMath");
 const prisma = new PrismaClient();
 
 async function main() {
@@ -125,9 +126,9 @@ async function main() {
     },
   });
 
-  // Transaction 4: still Pending — left for the payment cron to pick up, so
-  // running `npm run jobs:run` demonstrates the rolling/settlement split live
-  // (net 100, 10% rolling => 10 held back, 90 blocked until next settlement).
+  // Transaction 4: just completed (net 100, 10% rolling), so its blocked
+  // and rolling amounts are still fresh — shows the "just happened" state
+  // next to the 3 already-settled historical ones above.
   await prisma.transaction.create({
     data: {
       merchantId: merchantOne.id,
@@ -138,21 +139,26 @@ async function main() {
       gross: 100,
       fee: 0,
       net: 100,
-      transactionState: "Pending",
+      transactionState: "Completed",
+      completedAt: now,
+      rollingAmount: 10,
+      rollingReleaseAt: addRollingPeriod(now, "Monthly"),
+      settledAmount: 90,
+      settlementDate: addSettlementCycle(now, "Daily"),
     },
   });
 
-  // Merchant 1 wallet: the 3 historical transactions above are treated as
-  // already fully settled and released (net 980+490+294=1764, refunds
-  // 200+300=500 => 1264 sitting entirely in available balance).
+  // Merchant 1 wallet: the 3 historical transactions are fully settled and
+  // released (net 980+490+294=1764, refunds 200+300=500 => 1264 available),
+  // plus transaction 4 just above, still blocked (90) and rolling (10).
   await prisma.wallet.create({
     data: {
       merchantId: merchantOne.id,
       currencyId: currency.id,
-      totalBalance: 1264,
+      totalBalance: 1364,
       availableBalance: 1264,
-      blockedBalance: 0,
-      rollingBalance: 0,
+      blockedBalance: 90,
+      rollingBalance: 10,
     },
   });
 
