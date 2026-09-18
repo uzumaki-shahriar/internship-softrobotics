@@ -42,8 +42,19 @@ const merchantSession = sessionMiddleware("merchant.sid");
 const adminFlash = flash();
 const merchantFlash = flash();
 
-app.use("/admin", adminSession, adminFlash);
-app.use("/dashboard", merchantSession, merchantFlash);
+// Every /admin and /dashboard page is dynamic and session-specific - never
+// let a browser (or its back-forward cache) reuse a stale copy after a
+// mutation, which otherwise shows up as "I saved a change but it still
+// shows the old data" on refresh/back. Express sets an ETag on every
+// response by default; that's fine for static assets but wrong here.
+function noStore(req, res, next) {
+  res.set("Cache-Control", "no-store");
+  next();
+}
+
+app.use("/admin", adminSession, adminFlash, noStore);
+app.use("/dashboard", merchantSession, merchantFlash, noStore);
+app.use("/login", noStore);
 
 app.use((req, res, next) => {
   res.locals.appName = config.appName;

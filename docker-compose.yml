@@ -21,8 +21,14 @@ services:
       # /var/lib/postgresql (pg_ctlcluster-style), not .../data directly.
       - postgres_data:/var/lib/postgresql
       - ./docker/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh:ro
+    # Host port 5442, not 5432: this machine already has a native Postgres
+    # listening on 127.0.0.1:5432, which silently intercepts any host-side
+    # tool (Prisma Studio, `prisma migrate` run outside Docker) that
+    # connects to "localhost:5432" - it reaches the wrong Postgres entirely
+    # (empty/unrelated data, no error). Containers still talk to each other
+    # via the internal "postgres:5432" hostname above, unaffected by this.
     ports:
-      - "5432:5432"
+      - "5442:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s

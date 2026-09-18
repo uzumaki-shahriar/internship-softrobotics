@@ -33,10 +33,6 @@
         <div class="stat-label">Available</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value"><%= w.currency.code %> <%= w.blockedAmount %></div>
-        <div class="stat-label">Blocked (pending settlement)</div>
-      </div>
-      <div class="stat-card">
         <div class="stat-value"><%= w.currency.code %> <%= w.rollingAmount %></div>
         <div class="stat-label">Rolling reserve</div>
       </div>
@@ -47,6 +43,24 @@
     <div class="stat-label">Transactions today</div>
   </div>
 </div>
+
+<% if (wallets.length > 0) { %>
+  <h2>Withdraw to your bank account</h2>
+  <% if (withdrawError) { %><div class="flash flash-error"><%= withdrawError %></div><% } %>
+  <% if (!merchant.bankAccountNumber) { %>
+    <p class="muted">Link a bank account in <a href="/dashboard/settings">Settings</a> before withdrawing.</p>
+  <% } else { %>
+    <% wallets.forEach(function(w) { %>
+      <form method="post" action="/dashboard/overview/withdraw" class="confirm-form" data-confirm="Withdraw to your bank account?">
+        <input type="hidden" name="currency" value="<%= w.currency.code %>" />
+        <label><%= w.currency.code %> amount (available: <%= w.balance %>)
+          <input type="number" name="amount" step="0.01" min="0.01" max="<%= w.balance %>" required />
+        </label>
+        <button type="submit">Withdraw</button>
+      </form>
+    <% }) %>
+  <% } %>
+<% } %>
 
 <h2>Your rate</h2>
 <% if (merchant.pricingPlans.length === 0) { %>

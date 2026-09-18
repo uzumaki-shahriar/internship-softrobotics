@@ -49,59 +49,55 @@
   <p class="muted">Available excludes the not-settled and rolling-reserve amounts - those move into Available only once their own settlement/rolling job releases them.</p>
 <% } %>
 
-<h2>Pricing plans (the "deal")</h2>
-<% if (merchant.pricingPlans.length === 0) { %>
-  <p class="muted">No pricing plan yet - set one below to approve this merchant.</p>
-<% } else { %>
+<h2>POS</h2>
+<% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
+<% const pos = merchant.pricingPlans[0]; %>
+<form method="post" action="/admin/merchants/<%= merchant.id %>/approve" novalidate>
   <table>
-    <thead><tr><th>Currency</th><th>Commission %</th><th>Fixed fee</th><th>Settlement (days)</th><th>Rolling %</th><th>Rolling period</th></tr></thead>
     <tbody>
-      <% merchant.pricingPlans.forEach(function(p) { %>
-        <tr>
-          <td><%= p.currency.code %></td>
-          <td><%= p.commissionPercentage %>%</td>
-          <td><%= p.commissionFixed %></td>
-          <td><%= p.settlementDay %></td>
-          <td><%= p.rollingPercentage %>%</td>
-          <td><%= p.rollingPeriod %></td>
-        </tr>
-      <% }) %>
+      <tr>
+        <td class="muted">Currency</td>
+        <td>
+          <% if (pos) { %>
+            <%= pos.currency.code %> - <%= pos.currency.name %>
+            <input type="hidden" name="currency" value="<%= pos.currency.code %>" />
+          <% } else { %>
+            <select name="currency" required>
+              <% currencies.forEach(function(c) { %>
+                <option value="<%= c.code %>"><%= c.code %> - <%= c.name %></option>
+              <% }) %>
+            </select>
+          <% } %>
+        </td>
+      </tr>
+      <tr>
+        <td class="muted">Commission percentage</td>
+        <td><input type="number" name="commission_percentage" step="0.01" min="0" max="100" value="<%= pos ? pos.commissionPercentage : '2.00' %>" required /></td>
+      </tr>
+      <tr>
+        <td class="muted">Fixed fee</td>
+        <td><input type="number" name="commission_fixed" step="0.01" min="0" value="<%= pos ? pos.commissionFixed : '5.00' %>" required /></td>
+      </tr>
+      <tr>
+        <td class="muted">Settlement (days)</td>
+        <td><input type="number" name="settlement_day" min="0" value="<%= pos ? pos.settlementDay : '3' %>" required /></td>
+      </tr>
+      <tr>
+        <td class="muted">Rolling percentage</td>
+        <td><input type="number" name="rolling_percentage" step="0.01" min="0" max="100" value="<%= pos ? pos.rollingPercentage : '0' %>" required /></td>
+      </tr>
+      <tr>
+        <td class="muted">Rolling period</td>
+        <td>
+          <select name="rolling_period" required>
+            <option value="weekly" <%= pos && pos.rollingPeriod === "weekly" ? "selected" : "" %>>Weekly</option>
+            <option value="monthly" <%= !pos || pos.rollingPeriod !== "weekly" ? "selected" : "" %>>Monthly</option>
+          </select>
+        </td>
+      </tr>
     </tbody>
   </table>
-<% } %>
-
-<h3>Set / renegotiate a rate</h3>
-<% if (error) { %><div class="flash flash-error"><%= error %></div><% } %>
-<form method="post" action="/admin/merchants/<%= merchant.id %>/approve" id="approve-form" novalidate>
-  <label>Currency
-    <select name="currency" required>
-      <% currencies.forEach(function(c) { %>
-        <option value="<%= c.code %>" <%= values.currency === c.code ? "selected" : "" %>><%= c.code %> - <%= c.name %></option>
-      <% }) %>
-    </select>
-  </label>
-  <label>Commission percentage
-    <input type="number" name="commission_percentage" step="0.01" min="0" max="100"
-           value="<%= values.commission_percentage || '2.00' %>" required />
-  </label>
-  <label>Fixed fee
-    <input type="number" name="commission_fixed" step="0.01" min="0"
-           value="<%= values.commission_fixed || '5.00' %>" required />
-  </label>
-  <label>Settlement (days)
-    <input type="number" name="settlement_day" min="0" value="<%= values.settlement_day || '3' %>" required />
-  </label>
-  <label>Rolling percentage
-    <input type="number" name="rolling_percentage" step="0.01" min="0" max="100"
-           value="<%= values.rolling_percentage || '0' %>" required />
-  </label>
-  <label>Rolling period
-    <select name="rolling_period" required>
-      <option value="weekly" <%= values.rolling_period === "weekly" ? "selected" : "" %>>Weekly</option>
-      <option value="monthly" <%= values.rolling_period !== "weekly" ? "selected" : "" %>>Monthly</option>
-    </select>
-  </label>
-  <button type="submit">Save & activate</button>
+  <button type="submit">Save</button>
 </form>
 <script src="/js/validation.js"></script>
 

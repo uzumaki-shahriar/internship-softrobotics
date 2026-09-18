@@ -63,7 +63,7 @@ router.post("/", async (req, res, next) => {
 router.get("/:id", async (req, res, next) => {
   try {
     const detail = await loadMerchantDetail(Number(req.params.id));
-    res.render("merchants/show", { ...detail, error: null, values: {} });
+    res.render("merchants/show", { ...detail, error: null });
   } catch (err) {
     next(err);
   }

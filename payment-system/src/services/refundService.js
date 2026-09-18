@@ -34,6 +34,25 @@ async function refundTransaction(merchant, { invoice_id, amount }) {
     throw new ValidationError(`Refund amount exceeds the refundable balance (${remaining})`);
   }
 
+  const feeRatio = gross > 0 ? Number(transaction.feeAmount) / gross : 0;
+  const walletDebit = amount - amount * feeRatio;
+
+  // A merchant can withdraw money out of the wallet between the original
+  // sale and a later refund - if they've already cashed out more than this
+  // refund's net portion, the wallet genuinely doesn't hold enough to cover
+  // it. Reject before ever touching the bank, rather than silently zeroing
+  // the wallet's buckets and approving a refund the platform can't actually
+  // afford (that money already left to the merchant's real bank account).
+  const wallet = await prisma.wallet.findUniqueOrThrow({
+    where: { merchantId_currencyId: { merchantId: merchant.id, currencyId: transaction.currencyId } },
+  });
+  const walletTotal = Number(wallet.blockedAmount) + Number(wallet.balance) + Number(wallet.rollingAmount);
+  if (walletDebit > walletTotal) {
+    throw new ValidationError(
+      `Refund needs ${walletDebit.toFixed(2)} from the merchant's wallet, but only ${walletTotal.toFixed(2)} is held - the merchant has likely already withdrawn it to their bank account.`
+    );
+  }
+
   const refundCount = await prisma.refund.count({ where: { transactionId: transaction.id } });
   const idempotencyKey = `${transaction.invoiceId}:refund:${refundCount + 1}`;
 

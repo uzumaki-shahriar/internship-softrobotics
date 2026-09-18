@@ -10,8 +10,11 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
     "seed": "node prisma/seed.js",
-    "settlement:run": "node src/jobs/runSettlement.js"
+    "prisma:reset-transactions": "node prisma/reset.js",
+    "jobs:run": "node src/jobs/runOnce.js",
+    "settle": "node src/jobs/runSettlementOnce.js"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

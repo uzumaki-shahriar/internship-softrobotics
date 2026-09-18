@@ -35,7 +35,6 @@ const refundable = ["completed", "partial_refunded"].includes(transaction.status
     <tr><td class="muted">Created</td><td><%= transaction.createdAt.toISOString() %></td></tr>
     <tr><td class="muted">Expires</td><td><%= transaction.expiresAt.toISOString() %></td></tr>
     <% if (Number(transaction.blockedAmount) > 0) { %>
-      <tr><td class="muted">Blocked (pending settlement)</td><td><%= transaction.blockedAmount %></td></tr>
       <tr>
         <td class="muted">Settlement status</td>
         <td>
