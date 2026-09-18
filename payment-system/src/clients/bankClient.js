@@ -36,6 +36,15 @@ function refund(payload) {
 }
 
 /**
+ * Deposits settlement/rolling money into a merchant's payout account at
+ * the Bank System - no card involved, not tied to a prior charge. See
+ * bank-system's src/services/payoutService.js for the receiving side.
+ */
+function payout(payload) {
+  return callBank("/api/accounts/payout", payload);
+}
+
+/**
  * Confirms a charge's real outcome server-to-server when the customer's
  * browser bounces back from the Bank's OTP page - never trusts that
  * redirect alone. Same failure handling as callBank: unreachable/timeout
@@ -53,6 +62,24 @@ async function getChargeStatus(idempotencyKey) {
     return res.json();
   } catch {
     return { status: "declined", decline_reason: "GATEWAY_ERROR" };
+  }
+}
+
+/**
+ * Confirms an account number really exists at the Bank System before a
+ * merchant links it for payouts - returns null if not found or unreachable
+ * rather than throwing, since this is a validation check, not a payment.
+ */
+async function getAccountBalance(accountNumber) {
+  try {
+    const res = await fetch(`${config.bankApiBaseUrl}/api/accounts/${encodeURIComponent(accountNumber)}/balance`, {
+      headers: { "X-API-KEY": config.bankApiKey },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
   }
 }
 
@@ -74,4 +101,4 @@ async function getTestCards() {
   }
 }
 
-module.exports = { charge, refund, getChargeStatus, getTestCards };
+module.exports = { charge, refund, payout, getChargeStatus, getAccountBalance, getTestCards };

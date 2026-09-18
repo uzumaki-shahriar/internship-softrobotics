@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const prisma = require("../db");
-const { ConflictError, NotFoundError } = require("../errors");
+const bankClient = require("../clients/bankClient");
+const { ConflictError, NotFoundError, ValidationError } = require("../errors");
 const {
   generateStoreId,
   generateApiKey,
@@ -138,7 +139,10 @@ async function listMerchants({ page, pageSize }) {
  * they're active. Reused for both first approval and later renegotiating a
  * currency's rate - upsert semantics, not a one-time-only action.
  */
-async function approveMerchant(merchantId, { currency, commission_percentage, commission_fixed, settlement_day }) {
+async function approveMerchant(
+  merchantId,
+  { currency, commission_percentage, commission_fixed, settlement_day, rolling_percentage, rolling_period }
+) {
   const merchant = await prisma.merchant.findUnique({ where: { id: merchantId } });
   if (!merchant) throw new NotFoundError("Merchant not found");
 
@@ -148,13 +152,21 @@ async function approveMerchant(merchantId, { currency, commission_percentage, co
   const [pricingPlan] = await prisma.$transaction([
     prisma.pricingPlan.upsert({
       where: { merchantId_currencyId: { merchantId, currencyId: currencyRow.id } },
-      update: { commissionPercentage: commission_percentage, commissionFixed: commission_fixed, settlementDay: settlement_day },
+      update: {
+        commissionPercentage: commission_percentage,
+        commissionFixed: commission_fixed,
+        settlementDay: settlement_day,
+        rollingPercentage: rolling_percentage,
+        rollingPeriod: rolling_period,
+      },
       create: {
         merchantId,
         currencyId: currencyRow.id,
         commissionPercentage: commission_percentage,
         commissionFixed: commission_fixed,
         settlementDay: settlement_day,
+        rollingPercentage: rolling_percentage,
+        rollingPeriod: rolling_period,
       },
     }),
     prisma.wallet.upsert({
@@ -166,6 +178,22 @@ async function approveMerchant(merchantId, { currency, commission_percentage, co
   ]);
 
   return pricingPlan;
+}
+
+/**
+ * Links the merchant's real payout account at the Bank System - settlement
+ * and rolling release pay out here (see settlementService.js). Only
+ * confirms the account exists; the Bank's balance endpoint doesn't expose
+ * account type, so a personal account can't be rejected here.
+ */
+async function setBankAccount(merchantId, accountNumber) {
+  const account = await bankClient.getAccountBalance(accountNumber);
+  if (!account) throw new ValidationError("Bank account number not found");
+
+  return prisma.merchant.update({
+    where: { id: merchantId },
+    data: { bankAccountNumber: accountNumber },
+  });
 }
 
 async function setMerchantStatus(merchantId, status) {

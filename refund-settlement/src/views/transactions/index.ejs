@@ -1,0 +1,32 @@
+<%- include('../partials/head') %>
+
+<h1>Transactions</h1>
+
+<a href="/transactions/new" class="btn">New Transaction</a>
+
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Order</th>
+      <th>Gross</th>
+      <th>Fee</th>
+      <th>Net</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% transactions.forEach(function(t) { %>
+      <tr onclick="window.location='/transactions/<%= t.id %>'">
+        <td><%= t.id %></td>
+        <td><%= t.orderId %></td>
+        <td><%= t.gross %></td>
+        <td><%= t.fee %></td>
+        <td><%= t.net %></td>
+        <td><%= t.transactionState %></td>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>
+
+<%- include('../partials/foot') %>

@@ -3,6 +3,7 @@ const config = require("../config");
 const bankClient = require("../clients/bankClient");
 const { generateInvoiceId, generateAttemptToken } = require("../utils/generators");
 const { calculateFee } = require("../utils/fee");
+const { computeCompletionFields } = require("../utils/walletSplit");
 const { NotFoundError, ValidationError } = require("../errors");
 
 async function initCheckout(merchant, { order_id, amount, currency, success_url, fail_url }) {
@@ -155,6 +156,10 @@ async function applyBankResult(transaction, bankResult) {
 
   if (bankResult.status === "approved") {
     const { fee, net } = calculateFee(Number(transaction.grossAmount), transaction.pricingPlan);
+    const { rollingAmount, blockedAmount, rollingReleaseAt, settlementDate } = computeCompletionFields(
+      net,
+      transaction.pricingPlan
+    );
 
     [transaction] = await prisma.$transaction([
       prisma.transaction.update({
@@ -165,12 +170,21 @@ async function applyBankResult(transaction, bankResult) {
           bankReference: bankResult.bank_reference,
           feeAmount: fee,
           netAmount: net,
+          rollingAmount,
+          rollingReleaseAt,
+          blockedAmount,
+          settlementDate,
         },
       }),
       prisma.wallet.upsert({
         where: { merchantId_currencyId: { merchantId: transaction.merchantId, currencyId: transaction.currencyId } },
-        update: { balance: { increment: net } },
-        create: { merchantId: transaction.merchantId, currencyId: transaction.currencyId, balance: net },
+        update: { blockedAmount: { increment: blockedAmount }, rollingAmount: { increment: rollingAmount } },
+        create: {
+          merchantId: transaction.merchantId,
+          currencyId: transaction.currencyId,
+          blockedAmount,
+          rollingAmount,
+        },
       }),
     ]);
     return { terminal: true, redirectUrl: successUrlFor(transaction), status: "completed" };

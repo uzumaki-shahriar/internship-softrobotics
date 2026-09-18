@@ -106,15 +106,18 @@ model User {
 }
 
 model Merchant {
-  id            Int     @id @default(autoincrement())
-  userId        Int     @unique @map("user_id")
-  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  storeId       String  @unique @map("store_id")
-  name          String
-  address       String?
-  apiKeyHash    String         @unique @map("api_key_hash")
-  apiKeyPrefix  String         @map("api_key_prefix")
-  status        MerchantStatus @default(pending)
+  id                Int            @id @default(autoincrement())
+  userId            Int            @unique @map("user_id")
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  storeId           String         @unique @map("store_id")
+  name              String
+  address           String?
+  apiKeyHash        String         @unique @map("api_key_hash")
+  apiKeyPrefix      String         @map("api_key_prefix")
+  status            MerchantStatus @default(pending)
+  // Verified to exist at bank-system (see merchantService.setBankAccount)
+  // before saving; settlement payouts are sent here.
+  bankAccountNumber String?        @map("bank_account_number")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -130,15 +133,20 @@ model Merchant {
 // regardless of which bank issued the customer's card - real aggregators
 // absorb interchange variance themselves rather than passing it through.
 model PricingPlan {
-  id                   Int     @id @default(autoincrement())
-  merchantId           Int     @map("merchant_id")
+  id                   Int      @id @default(autoincrement())
+  merchantId           Int      @map("merchant_id")
   merchant             Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  currencyId           Int     @map("currency_id")
+  currencyId           Int      @map("currency_id")
   currency             Currency @relation(fields: [currencyId], references: [id])
-  commissionPercentage Decimal @default(0) @map("commission_percentage") @db.Decimal(5, 2)
-  commissionFixed      Decimal @default(0) @map("commission_fixed") @db.Decimal(10, 2)
-  settlementDay        Int     @default(3) @map("settlement_day")
-  status               Boolean @default(true)
+  commissionPercentage Decimal  @default(0) @map("commission_percentage") @db.Decimal(5, 2)
+  commissionFixed      Decimal  @default(0) @map("commission_fixed") @db.Decimal(10, 2)
+  settlementDay        Int      @default(3) @map("settlement_day")
+  // Portion of net held back per-transaction beyond the settlement cycle,
+  // released separately once rollingPeriod elapses from completion - see
+  // src/utils/walletSplit.js.
+  rollingPercentage    Decimal  @default(0) @map("rolling_percentage") @db.Decimal(5, 2)
+  rollingPeriod        String   @default("monthly") @map("rolling_period")
+  status               Boolean  @default(true)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -150,12 +158,16 @@ model PricingPlan {
 }
 
 model Wallet {
-  id         Int      @id @default(autoincrement())
-  merchantId Int      @map("merchant_id")
-  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  currencyId Int      @map("currency_id")
-  currency   Currency @relation(fields: [currencyId], references: [id])
-  balance    Decimal  @default(0) @db.Decimal(15, 2)
+  id            Int      @id @default(autoincrement())
+  merchantId    Int      @map("merchant_id")
+  merchant      Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  currencyId    Int      @map("currency_id")
+  currency      Currency @relation(fields: [currencyId], references: [id])
+  // Available / already paid toward settlement. Money sits in blockedAmount
+  // or rollingAmount until its own settlement/rolling job moves it here.
+  balance       Decimal  @default(0) @db.Decimal(15, 2)
+  blockedAmount Decimal  @default(0) @map("blocked_amount") @db.Decimal(15, 2)
+  rollingAmount Decimal  @default(0) @map("rolling_amount") @db.Decimal(15, 2)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -165,15 +177,15 @@ model Wallet {
 }
 
 model Transaction {
-  id            Int               @id @default(autoincrement())
-  invoiceId     String            @unique @map("invoice_id")
-  orderId       String            @map("order_id")
-  merchantId    Int               @map("merchant_id")
-  merchant      Merchant          @relation(fields: [merchantId], references: [id])
-  currencyId    Int               @map("currency_id")
-  currency      Currency          @relation(fields: [currencyId], references: [id])
-  pricingPlanId Int?              @map("pricing_plan_id")
-  pricingPlan   PricingPlan?      @relation(fields: [pricingPlanId], references: [id])
+  id            Int          @id @default(autoincrement())
+  invoiceId     String       @unique @map("invoice_id")
+  orderId       String       @map("order_id")
+  merchantId    Int          @map("merchant_id")
+  merchant      Merchant     @relation(fields: [merchantId], references: [id])
+  currencyId    Int          @map("currency_id")
+  currency      Currency     @relation(fields: [currencyId], references: [id])
+  pricingPlanId Int?         @map("pricing_plan_id")
+  pricingPlan   PricingPlan? @relation(fields: [pricingPlanId], references: [id])
 
   status         TransactionStatus @default(pending)
   grossAmount    Decimal           @map("gross_amount") @db.Decimal(15, 2)
@@ -196,10 +208,24 @@ model Transaction {
   attemptCount        Int     @default(0) @map("attempt_count")
   currentAttemptToken String? @map("current_attempt_token")
 
-  successUrl     String   @map("success_url")
-  failUrl        String   @map("fail_url")
-  expiresAt      DateTime @map("expires_at")
+  successUrl String   @map("success_url")
+  failUrl    String   @map("fail_url")
+  expiresAt  DateTime @map("expires_at")
+
+  // Non-rolling portion of netAmount, frozen at completion. settlementDate
+  // is when it becomes eligible (today + pricingPlan.settlementDay);
+  // settledAt is null while still blocked, set once runSettlement() pays
+  // it out - see src/services/settlementService.js.
+  blockedAmount  Decimal   @default(0) @map("blocked_amount") @db.Decimal(15, 2)
   settlementDate DateTime? @map("settlement_date") @db.Date
+  settledAt      DateTime? @map("settled_at")
+
+  // Rolling reserve: rollingPercentage of netAmount, held separately from
+  // blockedAmount and released on its own schedule (rollingReleaseAt),
+  // independent of the settlement cycle.
+  rollingAmount     Decimal   @default(0) @map("rolling_amount") @db.Decimal(15, 2)
+  rollingReleaseAt  DateTime? @map("rolling_release_at")
+  rollingReleasedAt DateTime? @map("rolling_released_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -211,15 +237,15 @@ model Transaction {
 }
 
 model Refund {
-  id             Int            @id @default(autoincrement())
-  transactionId  Int            @map("transaction_id")
-  transaction    Transaction    @relation(fields: [transactionId], references: [id])
-  invoiceId      String         @map("invoice_id")
-  amount         Decimal        @db.Decimal(15, 2)
-  status         RefundStatus
-  declineReason  DeclineReason? @map("decline_reason")
-  bankRefundReference String?   @map("bank_refund_reference")
-  idempotencyKey String         @unique @map("idempotency_key")
+  id                  Int            @id @default(autoincrement())
+  transactionId       Int            @map("transaction_id")
+  transaction         Transaction    @relation(fields: [transactionId], references: [id])
+  invoiceId           String         @map("invoice_id")
+  amount              Decimal        @db.Decimal(15, 2)
+  status              RefundStatus
+  declineReason       DeclineReason? @map("decline_reason")
+  bankRefundReference String?        @map("bank_refund_reference")
+  idempotencyKey      String         @unique @map("idempotency_key")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

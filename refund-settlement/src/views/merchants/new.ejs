@@ -1,0 +1,12 @@
+<%- include('../partials/head') %>
+
+<h1>New Merchant</h1>
+
+<form method="POST" action="/merchants">
+  <label>Name</label>
+  <input type="text" name="name" required />
+
+  <button type="submit" class="btn">Create Merchant</button>
+</form>
+
+<%- include('../partials/foot') %>

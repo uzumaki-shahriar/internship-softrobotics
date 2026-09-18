@@ -1,0 +1,37 @@
+<%- include('../partials/head') %>
+
+<h1>Merchants</h1>
+
+<a href="/merchants/new" class="btn">New Merchant</a>
+
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Name</th>
+      <th>Transactions</th>
+      <th>Wallet Total</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% merchants.forEach(function(m) { %>
+      <tr>
+        <td><%= m.id %></td>
+        <td><%= m.name %></td>
+        <td><%= m._count.transactions %></td>
+        <td>
+          <% m.wallets.forEach(function(w) { %>
+            <%= w.currency.code %> <%= w.totalBalance %><br />
+          <% }); %>
+        </td>
+        <td>
+          <a href="/merchants/<%= m.id %>/dashboard">Dashboard</a> ·
+          <a href="/merchants/<%= m.id %>/settlement-config">Edit</a>
+        </td>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>
+
+<%- include('../partials/foot') %>

@@ -37,7 +37,7 @@
   <p class="muted">No pricing plan yet - set one below to approve this merchant.</p>
 <% } else { %>
   <table>
-    <thead><tr><th>Currency</th><th>Commission %</th><th>Fixed fee</th><th>Settlement (days)</th></tr></thead>
+    <thead><tr><th>Currency</th><th>Commission %</th><th>Fixed fee</th><th>Settlement (days)</th><th>Rolling %</th><th>Rolling period</th></tr></thead>
     <tbody>
       <% merchant.pricingPlans.forEach(function(p) { %>
         <tr>
@@ -45,6 +45,8 @@
           <td><%= p.commissionPercentage %>%</td>
           <td><%= p.commissionFixed %></td>
           <td><%= p.settlementDay %></td>
+          <td><%= p.rollingPercentage %>%</td>
+          <td><%= p.rollingPeriod %></td>
         </tr>
       <% }) %>
     </tbody>
@@ -71,6 +73,16 @@
   </label>
   <label>Settlement (days)
     <input type="number" name="settlement_day" min="0" value="<%= values.settlement_day || '3' %>" required />
+  </label>
+  <label>Rolling percentage
+    <input type="number" name="rolling_percentage" step="0.01" min="0" max="100"
+           value="<%= values.rolling_percentage || '0' %>" required />
+  </label>
+  <label>Rolling period
+    <select name="rolling_period" required>
+      <option value="weekly" <%= values.rolling_period === "weekly" ? "selected" : "" %>>Weekly</option>
+      <option value="monthly" <%= values.rolling_period !== "weekly" ? "selected" : "" %>>Monthly</option>
+    </select>
   </label>
   <button type="submit">Save & activate</button>
 </form>

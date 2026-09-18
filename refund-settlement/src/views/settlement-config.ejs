@@ -1,0 +1,56 @@
+<%- include('partials/head') %>
+
+<h1>Edit Merchant — <%= merchant.name %></h1>
+
+<form method="POST" action="/merchants/<%= merchant.id %>/settlement-config">
+  <label>Name</label>
+  <input type="text" name="name" value="<%= merchant.name %>" required />
+
+  <label>Settlement Cycle</label>
+  <select name="settlement_cycle" required>
+    <% ["Daily", "Weekly", "Monthly"].forEach(function(cycle) { %>
+      <option value="<%= cycle %>" <%= merchant.settlementCycle === cycle ? "selected" : "" %>>
+        <%= cycle %>
+      </option>
+    <% }); %>
+  </select>
+
+  <label>Rolling Percentage (%)</label>
+  <input type="number" step="0.01" min="0" max="100" name="rolling_percentage" value="<%= merchant.rollingPercentage %>" required />
+
+  <label>Rolling Period</label>
+  <select name="rolling_period" required>
+    <% ["Weekly", "Monthly"].forEach(function(period) { %>
+      <option value="<%= period %>" <%= merchant.rollingPeriod === period ? "selected" : "" %>>
+        <%= period %>
+      </option>
+    <% }); %>
+  </select>
+
+  <button type="submit" class="btn">Save Configuration</button>
+</form>
+
+<h2>Withdraw Funds</h2>
+<form method="POST" action="/merchants/<%= merchant.id %>/settlements">
+  <label>Withdrawal Amount</label>
+  <input type="number" step="0.01" name="amount" required />
+  <button type="submit" class="btn">Withdraw</button>
+</form>
+
+<h2>Settlements</h2>
+<table>
+  <thead>
+    <tr><th>ID</th><th>Amount</th><th>Status</th></tr>
+  </thead>
+  <tbody>
+    <% settlements.forEach(function(s) { %>
+      <tr>
+        <td><%= s.id %></td>
+        <td><%= s.amount %></td>
+        <td><%= s.status %></td>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>
+
+<%- include('partials/foot') %>

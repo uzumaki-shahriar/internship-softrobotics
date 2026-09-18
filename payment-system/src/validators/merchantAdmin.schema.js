@@ -7,6 +7,8 @@ const approveSchema = z.object({
   commission_percentage: z.coerce.number().min(0).max(100),
   commission_fixed: z.coerce.number().min(0),
   settlement_day: z.coerce.number().int().min(0).default(3),
+  rolling_percentage: z.coerce.number().min(0).max(100).default(0),
+  rolling_period: z.enum(["weekly", "monthly"]).default("monthly"),
 });
 
 // Admin-assisted onboarding - no password field, one is generated and

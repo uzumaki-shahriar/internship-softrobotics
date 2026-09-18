@@ -1,0 +1,35 @@
+<%- include('../partials/head') %>
+
+<h1>New Transaction</h1>
+
+<form method="POST" action="/transactions">
+  <label>Merchant</label>
+  <select name="merchant_id" required>
+    <% merchants.forEach(function(m) { %>
+      <option value="<%= m.id %>" <%= selectedMerchantId === m.id ? "selected" : "" %>>
+        <%= m.name %>
+      </option>
+    <% }); %>
+  </select>
+
+  <label>Amount</label>
+  <input type="number" step="0.01" name="amount" required />
+
+  <label>Currency</label>
+  <select name="currency_id" required>
+    <% currencies.forEach(function(c) { %>
+      <option value="<%= c.id %>"><%= c.code %></option>
+    <% }); %>
+  </select>
+
+  <label>POS</label>
+  <select name="pos_id" required>
+    <% posList.forEach(function(p) { %>
+      <option value="<%= p.id %>"><%= p.name %></option>
+    <% }); %>
+  </select>
+
+  <button type="submit" class="btn">Create Transaction</button>
+</form>
+
+<%- include('../partials/foot') %>

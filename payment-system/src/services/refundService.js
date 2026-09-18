@@ -62,29 +62,56 @@ async function refundTransaction(merchant, { invoice_id, amount }) {
   const newRefundedAmount = alreadyRefunded + amount;
   const isFullyRefunded = newRefundedAmount >= gross;
 
-  const [refund, updatedTransaction] = await prisma.$transaction([
-    prisma.refund.create({
-      data: {
-        transactionId: transaction.id,
-        invoiceId: transaction.invoiceId,
-        amount,
-        status: "approved",
-        bankRefundReference: bankResult.bank_reference,
-        idempotencyKey,
-      },
-    }),
-    prisma.transaction.update({
-      where: { id: transaction.id },
-      data: {
-        refundedAmount: newRefundedAmount,
-        status: isFullyRefunded ? "refunded" : "partial_refunded",
-      },
-    }),
-    prisma.wallet.update({
+  const [refund, updatedTransaction] = await prisma.$transaction(async (tx) => {
+    const wallet = await tx.wallet.findUniqueOrThrow({
       where: { merchantId_currencyId: { merchantId: merchant.id, currencyId: transaction.currencyId } },
-      data: { balance: { decrement: walletDebit } },
-    }),
-  ]);
+    });
+
+    // Deducted blocked first, then available, then rolling - a refund can
+    // land on money that hasn't settled yet, so it never has to wait on a
+    // bucket that happens to be empty. See refund-settlement's
+    // transactionController.refund() for the same priority order.
+    let remaining = walletDebit;
+    let blockedAmount = Number(wallet.blockedAmount);
+    let balance = Number(wallet.balance);
+    let rollingAmount = Number(wallet.rollingAmount);
+
+    const fromBlocked = Math.min(remaining, blockedAmount);
+    blockedAmount -= fromBlocked;
+    remaining -= fromBlocked;
+
+    const fromBalance = Math.min(remaining, balance);
+    balance -= fromBalance;
+    remaining -= fromBalance;
+
+    const fromRolling = Math.min(remaining, rollingAmount);
+    rollingAmount -= fromRolling;
+    remaining -= fromRolling;
+
+    return Promise.all([
+      tx.refund.create({
+        data: {
+          transactionId: transaction.id,
+          invoiceId: transaction.invoiceId,
+          amount,
+          status: "approved",
+          bankRefundReference: bankResult.bank_reference,
+          idempotencyKey,
+        },
+      }),
+      tx.transaction.update({
+        where: { id: transaction.id },
+        data: {
+          refundedAmount: newRefundedAmount,
+          status: isFullyRefunded ? "refunded" : "partial_refunded",
+        },
+      }),
+      tx.wallet.update({
+        where: { id: wallet.id },
+        data: { blockedAmount, balance, rollingAmount },
+      }),
+    ]);
+  });
 
   return {
     status: "approved",
