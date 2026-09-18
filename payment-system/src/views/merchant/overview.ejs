@@ -45,6 +45,22 @@
 </div>
 
 <% if (wallets.length > 0) { %>
+  <h2>Deposit from your bank account</h2>
+  <% if (depositError) { %><div class="flash flash-error"><%= depositError %></div><% } %>
+  <% if (!merchant.bankAccountNumber) { %>
+    <p class="muted">Link a bank account in <a href="/dashboard/settings">Settings</a> before depositing.</p>
+  <% } else { %>
+    <% wallets.forEach(function(w) { %>
+      <form method="post" action="/dashboard/overview/deposit" class="confirm-form" data-confirm="Deposit from your bank account?">
+        <input type="hidden" name="currency" value="<%= w.currency.code %>" />
+        <label><%= w.currency.code %> amount
+          <input type="number" name="amount" step="0.01" min="0.01" required />
+        </label>
+        <button type="submit">Deposit</button>
+      </form>
+    <% }) %>
+  <% } %>
+
   <h2>Withdraw to your bank account</h2>
   <% if (withdrawError) { %><div class="flash flash-error"><%= withdrawError %></div><% } %>
   <% if (!merchant.bankAccountNumber) { %>

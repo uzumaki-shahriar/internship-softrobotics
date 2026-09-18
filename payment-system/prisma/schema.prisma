@@ -33,6 +33,11 @@ enum TransactionStatus {
 enum RefundStatus {
   approved
   declined
+  // Bank has already reversed the charge to the customer, but the
+  // merchant's wallet doesn't currently hold enough to cover the net
+  // portion (e.g. they already withdrew it) - awaiting manual resolution
+  // once funds are available. See refundService.resolvePendingRefund.
+  pending
 }
 
 // Gateway-only additions (SESSION_EXPIRED, GATEWAY_ERROR) sit alongside the
@@ -246,6 +251,13 @@ model Refund {
   declineReason       DeclineReason? @map("decline_reason")
   bankRefundReference String?        @map("bank_refund_reference")
   idempotencyKey      String         @unique @map("idempotency_key")
+
+  // The net (non-commission) portion owed to the merchant's wallet for
+  // this refund - computed once at refund time, reused unchanged whenever
+  // resolvePendingRefund eventually applies it. walletSettledAt is null
+  // while status is "pending"; set once the wallet is actually debited.
+  walletDebit     Decimal   @default(0) @map("wallet_debit") @db.Decimal(15, 2)
+  walletSettledAt DateTime? @map("wallet_settled_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

@@ -1,7 +1,7 @@
 <h1>Refunds</h1>
 <table>
   <thead>
-    <tr><th>When</th><th>Invoice</th><th>Merchant</th><th>Amount</th><th>Status</th><th>Reason</th><th>Bank ref</th></tr>
+    <tr><th>When</th><th>Invoice</th><th>Merchant</th><th>Amount</th><th>Wallet debit</th><th>Status</th><th>Reason</th><th>Bank ref</th><th></th></tr>
   </thead>
   <tbody>
     <% refunds.forEach(function(r) { %>
@@ -10,9 +10,17 @@
         <td><%= r.invoiceId %></td>
         <td><a href="/admin/merchants/<%= r.transaction.merchant.id %>"><%= r.transaction.merchant.storeId %></a></td>
         <td><%= r.amount %> <%= r.transaction.currency.code %></td>
+        <td><%= r.walletDebit %></td>
         <td><span class="badge badge-<%= r.status %>"><%= r.status %></span></td>
         <td><%= r.declineReason || "-" %></td>
         <td><%= r.bankRefundReference || "-" %></td>
+        <td>
+          <% if (r.status === "pending") { %>
+            <form method="post" action="/admin/refunds/<%= r.id %>/resolve">
+              <button type="submit">Resolve</button>
+            </form>
+          <% } %>
+        </td>
       </tr>
     <% }) %>
   </tbody>

@@ -45,6 +45,16 @@ function payout(payload) {
 }
 
 /**
+ * Pulls money OUT of a merchant's linked bank account into their PSP
+ * wallet - the opposite of payout. See bank-system's
+ * src/services/debitService.js for the debiting side (checks balance,
+ * account status, daily limit; declines with INSUFFICIENT_FUNDS etc.).
+ */
+function debit(payload) {
+  return callBank("/api/accounts/debit", payload);
+}
+
+/**
  * Confirms a charge's real outcome server-to-server when the customer's
  * browser bounces back from the Bank's OTP page - never trusts that
  * redirect alone. Same failure handling as callBank: unreachable/timeout
@@ -101,4 +111,4 @@ async function getTestCards() {
   }
 }
 
-module.exports = { charge, refund, payout, getChargeStatus, getAccountBalance, getTestCards };
+module.exports = { charge, refund, payout, debit, getChargeStatus, getAccountBalance, getTestCards };

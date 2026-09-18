@@ -59,6 +59,11 @@ router.post("/:invoiceId/refund", async (req, res, next) => {
     const result = await refundTransaction(transaction.merchant, { invoice_id: transaction.invoiceId, amount });
     if (result.status === "declined") {
       req.flash("error", `Refund declined: ${result.decline_reason}`);
+    } else if (result.status === "pending") {
+      req.flash(
+        "error",
+        `Refunded ${amount} to the customer, but the merchant's wallet doesn't currently hold enough to cover it - marked pending in Refunds until resolved.`
+      );
     } else {
       req.flash("success", `Refunded ${amount}.`);
     }

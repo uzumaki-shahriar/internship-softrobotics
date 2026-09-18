@@ -1,7 +1,7 @@
 const express = require("express");
 const prisma = require("../../db");
 const { getMerchantProfile } = require("../../services/merchantService");
-const { getWallets, withdraw } = require("../../services/walletService");
+const { getWallets, withdraw, deposit } = require("../../services/walletService");
 
 const router = express.Router();
 
@@ -26,7 +26,7 @@ async function loadOverview(merchantId) {
 router.get("/overview", async (req, res, next) => {
   try {
     const data = await loadOverview(req.session.merchantId);
-    res.render("merchant/overview", { ...data, withdrawError: null });
+    res.render("merchant/overview", { ...data, withdrawError: null, depositError: null });
   } catch (err) {
     next(err);
   }
@@ -39,7 +39,7 @@ router.post("/overview/withdraw", async (req, res, next) => {
 
     const result = await withdraw(req.session.merchantId, currency, amount);
     if (result.status === "declined") {
-      req.flash("error", `Withdrawal declined: ${result.decline_reason}`);
+      req.flash("error", `Withdrawal declined: ${result.message}`);
     } else {
       req.flash("success", `Withdrew ${amount} ${currency}.`);
     }
@@ -47,7 +47,28 @@ router.post("/overview/withdraw", async (req, res, next) => {
   } catch (err) {
     if (err.statusCode === 422) {
       const data = await loadOverview(req.session.merchantId);
-      return res.status(422).render("merchant/overview", { ...data, withdrawError: err.message });
+      return res.status(422).render("merchant/overview", { ...data, withdrawError: err.message, depositError: null });
+    }
+    next(err);
+  }
+});
+
+router.post("/overview/deposit", async (req, res, next) => {
+  try {
+    const currency = req.body.currency;
+    const amount = Number(req.body.amount);
+
+    const result = await deposit(req.session.merchantId, currency, amount);
+    if (result.status === "declined") {
+      req.flash("error", `Deposit declined: ${result.message}`);
+    } else {
+      req.flash("success", `Deposited ${amount} ${currency}.`);
+    }
+    res.redirect("/dashboard/overview");
+  } catch (err) {
+    if (err.statusCode === 422) {
+      const data = await loadOverview(req.session.merchantId);
+      return res.status(422).render("merchant/overview", { ...data, withdrawError: null, depositError: err.message });
     }
     next(err);
   }

@@ -114,6 +114,19 @@ settlement money (see "Merchant accounts" below). Declines:
 `CURRENCY_NOT_SUPPORTED`, `ACCOUNT_NOT_FOUND`, `ACCOUNT_FROZEN`,
 `ACCOUNT_CLOSED`.
 
+### `POST /api/accounts/debit`
+
+```json
+{ "account_number": "DEMO5225871423", "amount": 100.00, "currency": "BDT", "idempotency_key": "DEPOSIT-...", "reference": "DEPOSIT-..." }
+```
+
+The mirror of `/api/accounts/payout` - pulls money **out** of an account
+with no card, instead of crediting it. This is how a merchant deposits from
+their own linked bank account into their Payment Gateway wallet. Checks
+balance and the account's daily limit the same way a real card charge does.
+Declines: `CURRENCY_NOT_SUPPORTED`, `ACCOUNT_NOT_FOUND`, `ACCOUNT_FROZEN`,
+`ACCOUNT_CLOSED`, `INSUFFICIENT_FUNDS`, `LIMIT_EXCEEDED`.
+
 ### `GET /api/accounts/{account_number}/balance`
 
 Testing/admin convenience - `{"account_number":"...","balance":...,"status":"active"}`.

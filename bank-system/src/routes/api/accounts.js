@@ -2,8 +2,10 @@ const express = require("express");
 const prisma = require("../../db");
 const { NotFoundError } = require("../../errors");
 const { payoutSchema } = require("../../validators/payout.schema");
+const { debitSchema } = require("../../validators/debit.schema");
 const { validateBody } = require("../../middleware/validate");
 const { payoutToAccount } = require("../../services/payoutService");
+const { debitAccount } = require("../../services/debitService");
 const { annotateOutcome } = require("../../utils/logOutcome");
 
 const router = express.Router();
@@ -30,6 +32,19 @@ router.get("/:accountNumber/balance", async (req, res, next) => {
 router.post("/payout", validateBody(payoutSchema), async (req, res, next) => {
   try {
     const result = await payoutToAccount(req.body);
+    annotateOutcome(res, result);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Pulls money out of an account with no card - the opposite of /payout.
+// See services/debitService.js. Used by the Payment Gateway for merchant
+// deposits (merchant's own bank account -> their PSP wallet).
+router.post("/debit", validateBody(debitSchema), async (req, res, next) => {
+  try {
+    const result = await debitAccount(req.body);
     annotateOutcome(res, result);
     res.json(result);
   } catch (err) {
