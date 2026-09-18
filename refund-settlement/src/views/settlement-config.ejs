@@ -1,0 +1,56 @@
+<%- include('partials/head') %>
+
+<h1>Settlement Configuration — <%= merchant.name %></h1>
+
+<form method="POST" action="/merchants/<%= merchant.id %>/settlement-config">
+  <label>Settlement Cycle</label>
+  <select name="settlement_cycle" required>
+    <% ["Daily", "Weekly", "Monthly"].forEach(function(cycle) { %>
+      <option value="<%= cycle %>" <%= config && config.settlementCycle === cycle ? "selected" : "" %>>
+        <%= cycle %>
+      </option>
+    <% }); %>
+  </select>
+
+  <label>Settlement Time</label>
+  <input type="time" name="settlement_time" value="<%= config ? config.settlementTime : '02:00' %>" required />
+
+  <label>Rolling Percentage (%)</label>
+  <input type="number" step="0.01" min="0" max="100" name="rolling_percentage" value="<%= config ? config.rollingPercentage : 0 %>" required />
+
+  <label>Rolling Period</label>
+  <select name="rolling_period" required>
+    <% ["Weekly", "Monthly"].forEach(function(period) { %>
+      <option value="<%= period %>" <%= config && config.rollingPeriod === period ? "selected" : "" %>>
+        <%= period %>
+      </option>
+    <% }); %>
+  </select>
+
+  <button type="submit" class="btn">Save Configuration</button>
+</form>
+
+<h2>Request Settlement</h2>
+<form method="POST" action="/merchants/<%= merchant.id %>/settlements">
+  <label>Settlement Amount</label>
+  <input type="number" step="0.01" name="amount" required />
+  <button type="submit" class="btn">Request Settlement</button>
+</form>
+
+<h2>Settlements</h2>
+<table>
+  <thead>
+    <tr><th>ID</th><th>Amount</th><th>Status</th></tr>
+  </thead>
+  <tbody>
+    <% settlements.forEach(function(s) { %>
+      <tr>
+        <td><%= s.id %></td>
+        <td><%= s.amount %></td>
+        <td><%= s.status %></td>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>
+
+<%- include('partials/foot') %>
